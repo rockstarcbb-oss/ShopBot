@@ -47,10 +47,6 @@ dp = Dispatcher(storage=RedisStorage(redis))
 
 async def _startup() -> None:
     await create_db_and_tables()
-    await bot.set_webhook(
-        url=config.WEBHOOK_URL,
-        secret_token=config.WEBHOOK_SECRET_TOKEN
-    )
     static = Path("static")
     if static.exists() is False:
         static.mkdir()
