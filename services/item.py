@@ -185,16 +185,16 @@ class ItemService:
     async def get_all_types(callback_data: AllCategoriesCallback,
                             session: AsyncSession,
                             language: Language) -> tuple[InputMediaPhoto, InlineKeyboardBuilder]:
-        callback_data = callback_data or AllCategoriesCallback.create(0)
-        kb_builder = InlineKeyboardBuilder()
-        available_item_types = await ItemRepository.get_available_item_types(session)
-        for item_type in available_item_types:
+    callback_data = callback_data or AllCategoriesCallback.create(0)
+    kb_builder = InlineKeyboardBuilder()
+    available_item_types = await ItemRepository.get_available_item_types(session)
+    for item_type in available_item_types:
         kb_builder.button(
-            text=get_text(language, BotEntity.USER, "pick_all_item_types"),
+            text=item_type.get_localized(language),
             callback_data=callback_data.model_copy(update={"level": callback_data.level + 1,
-                                                           "item_type": None})
+                                                           "item_type": item_type})
         )
-        kb_builder.adjust(1)
+    kb_builder.adjust(1)
         caption = get_text(language, BotEntity.USER, "pick_item_type")
         button_media = await ButtonMediaRepository.get_by_button(
             KeyboardButton.ALL_CATEGORIES, session
