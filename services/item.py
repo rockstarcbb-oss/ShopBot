@@ -163,40 +163,22 @@ class ItemService:
             return items_list
 
     @staticmethod
-    async def add_items(path_to_file: str,
-                        add_type: AddType,
-                        session: AsyncSession | Session,
-                        language: Language) -> str:
-        try:
-            items = []
-            if add_type == AddType.JSON:
-                items += await ItemService.parse_items_json(path_to_file, session)
-            else:
-                items += await ItemService.parse_items_txt(path_to_file, session)
-            await ItemRepository.add_many(items, session)
-            await session_commit(session)
-            return get_text(language, BotEntity.ADMIN, "add_items_success").format(adding_result=len(items))
-        except Exception as e:
-            return get_text(language, BotEntity.ADMIN, "add_items_err").format(adding_result=e)
-        finally:
-            Path(path_to_file).unlink(missing_ok=True)
-
-    @staticmethod
     async def get_all_types(callback_data: AllCategoriesCallback,
                             session: AsyncSession,
                             language: Language) -> tuple[InputMediaPhoto, InlineKeyboardBuilder]:
-    callback_data = callback_data or AllCategoriesCallback.create(0)
-    kb_builder = InlineKeyboardBuilder()
-    available_item_types = await ItemRepository.get_available_item_types(session)
-    for item_type in available_item_types:
-        kb_builder.button(
-            text=item_type.get_localized(language),
-            callback_data=callback_data.model_copy(update={"level": callback_data.level + 1,
-                                                           "item_type": item_type})
-        )
-    kb_builder.adjust(1)
+        callback_data = callback_data or AllCategoriesCallback.create(0)
+        kb_builder = InlineKeyboardBuilder()
+        available_item_types = await ItemRepository.get_available_item_types(session)
+        for item_type in available_item_types:
+            kb_builder.button(
+                text=item_type.get_localized(language),
+                callback_data=callback_data.model_copy(update={"level": callback_data.level + 1,
+                                                               "item_type": item_type})
+            )
+        kb_builder.adjust(1)
         caption = get_text(language, BotEntity.USER, "pick_item_type")
         button_media = await ButtonMediaRepository.get_by_button(
             KeyboardButton.ALL_CATEGORIES, session
         )
         return MediaService.convert_to_media(button_media.media_id, caption=caption), kb_builder
+
