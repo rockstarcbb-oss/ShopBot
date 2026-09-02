@@ -78,9 +78,13 @@ async def _startup() -> None:
     if config.CRYPTO_FORWARDING_MODE:
         for cryptocurrency in Cryptocurrency:
             forwarding_address = cryptocurrency.get_forwarding_address()
-            # Jei adresas tuščias arba nerastas, tiesiog praleidžiame validaciją ir nebeišjungiame boto
             if not forwarding_address or forwarding_address in ["None", "false", ""]:
                 continue
+            
+            # --- ŠI DALIS IŠJUNGIA TIKRINIMĄ LITECOIN VALIUTAI ---
+            if cryptocurrency.name == "LTC":
+                continue # Tiesiog praleidžiame tikrinimą, adresas lieka aktyvus!
+                
             is_addr_valid = WalletService.validate_withdrawal_address(forwarding_address, cryptocurrency)
             if is_addr_valid is False:
                 logging.error(
