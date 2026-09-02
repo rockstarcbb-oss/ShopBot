@@ -30,6 +30,10 @@ async def all_types(**kwargs):
     session: AsyncSession = kwargs.get("session")
     language: Language = kwargs.get("language")
     media, kb_builder = await ItemService.get_all_types(callback_data, session, language)
+    
+    # Ši eilutė suranda ir visiškai ištrina 'Pick All Item Types' mygtuką iš sąrašo:
+    kb_builder.inputs.pop(0) if kb_builder.inputs else None
+
     if isinstance(message, Message):
         await NotificationService.answer_media(message, media, kb_builder.as_markup())
     else:
