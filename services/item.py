@@ -189,11 +189,6 @@ class ItemService:
         kb_builder = InlineKeyboardBuilder()
         available_item_types = await ItemRepository.get_available_item_types(session)
         for item_type in available_item_types:
-            kb_builder.button(
-                text=item_type.get_localized(language),
-                callback_data=callback_data.model_copy(update={"level": callback_data.level + 1,
-                                                               "item_type": item_type})
-            )
         kb_builder.button(
             text=get_text(language, BotEntity.USER, "pick_all_item_types"),
             callback_data=callback_data.model_copy(update={"level": callback_data.level + 1,
