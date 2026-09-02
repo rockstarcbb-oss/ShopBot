@@ -7,7 +7,7 @@ from enums.runtime_environment import RuntimeEnvironment
 from utils.utils import get_sslipio_external_url, start_ngrok, hash_password
 
 load_dotenv(".env.bot.dev")
-RUNTIME_ENVIRONMENT = RuntimeEnvironment(os.environ.get("RUNTIME_ENVIRONMENT"))
+RUNTIME_ENVIRONMENT = "production"
 if RUNTIME_ENVIRONMENT == RuntimeEnvironment.DEV:
     WEBHOOK_HOST = start_ngrok()
 else:
