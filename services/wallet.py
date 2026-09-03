@@ -128,8 +128,8 @@ class WalletService:
         if not address:
             return False
         address_regex = {
-            Cryptocurrency.BTC: re.compile(r'^bc1[a-zA-HJ-NP-Z0-9]{25,39}$'),
-            Cryptocurrency.LTC: re.compile(r'^ltc1[a-zA-HJ-NP-Z0-9]{26,}$'),
+            Cryptocurrency.BTC: re.compile(r'^(?:[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-zA-HJ-NP-Z0-9]{25,39})$'),
+            Cryptocurrency.LTC: re.compile(r'^(?:[LM3][a-km-zA-HJ-NP-Z1-9]{25,34}|ltc1[a-zA-HJ-NP-Z0-9]{26,})$'),
             Cryptocurrency.ETH: re.compile(r'^0x[a-fA-F0-9]{40}$'),
             Cryptocurrency.BNB: re.compile(r'^0x[a-fA-F0-9]{40}$'),
             Cryptocurrency.SOL: re.compile(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$'),
