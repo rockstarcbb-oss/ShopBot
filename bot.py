@@ -46,6 +46,8 @@ dp = Dispatcher(storage=RedisStorage(redis))
 
 async def _startup() -> None:
     await create_db_and_tables()
+    logging.warning("Crypto payment callback URL (must be reachable by the provider): %s",
+                    f"{config.WEBHOOK_URL}cryptoprocessing/event")
     await MediaService.ensure_bot_photo(bot)
     await MediaService.update_inaccessible_media(bot)
     validate_i18n()

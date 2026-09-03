@@ -140,6 +140,7 @@
     "notification_new_deposit_id": "💰 Новый депозит от пользователя с ID {telegram_id} на {currency_sym}{deposit_amount_fiat:.2f} с 💰 {value} {crypto_name}\n💰 Реферальный бонус: {currency_sym}{referral_bonus:.2f}\n💰 Бонус реферера: {currency_sym}{referrer_bonus:.2f}",
     "notification_new_deposit_username": "💰 Новый депозит от пользователя с username @{username} на {currency_sym}{deposit_amount_fiat:.2f} с 💰 {value} {crypto_name}\n💰 Реферальный бонус: {currency_sym}{referral_bonus:.2f}\n💰 Бонус реферера: {currency_sym}{referrer_bonus:.2f}",
     "crypto_wallet": "\n\n<b>🤖 Балансы бота\n\n{wallet_content}</b>",
+    "crypto_withdrawal_failed": "❌ <b>Не удалось выполнить вывод:</b> <code>{error}</code>\n\nЕсли в ошибке указано \"Access denied\", вашему API-ключу KryptoExpress не разрешён вывод средств: включите разрешение на вывод для API-ключа (и вывод средств для вашего аккаунта) в панели провайдера, затем попробуйте ещё раз.",
     "crypto_wallet_line": "⚖️ Баланс {crypto_name}: <code>{crypto_balance:.8f}</code> {crypto_name}",
     "deposits_statistics_msg": "📊 <b>Статистика депозитов за последние {timedelta}.\n\n💸 Всего депозитов: {deposits_count}\n\n{deposits_content}\n\n💼 Всего депозитов в криптовалюте на сумму: {fiat_amount:.2f} {currency_text}</b>",
     "deposits_statistics_line": "💰 Всего депозитов {crypto_name} на сумму: {crypto_amount:.8f} {crypto_name}",

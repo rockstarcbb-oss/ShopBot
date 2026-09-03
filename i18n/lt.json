@@ -140,6 +140,7 @@
     "notification_new_deposit_id": "💰 Nauja įmoka nuo naudotojo su ID {telegram_id} – {currency_sym}{deposit_amount_fiat:.2f} su 💰 {value} {crypto_name}\n💰 Rekomendacijos premija: {currency_sym}{referral_bonus:.2f}\n💰 Rekomendavusiojo premija: {currency_sym}{referrer_bonus:.2f}",
     "notification_new_deposit_username": "💰 Nauja įmoka nuo naudotojo su vartotojo vardu @{username} – {currency_sym}{deposit_amount_fiat:.2f} su 💰 {value} {crypto_name}\n💰 Rekomendacijos premija: {currency_sym}{referral_bonus:.2f}\n💰 Rekomendavusiojo premija: {currency_sym}{referrer_bonus:.2f}",
     "crypto_wallet": "\n\n<b>🤖 Boto balansai\n\n{wallet_content}</b>",
+    "crypto_withdrawal_failed": "❌ <b>Išmokėjimas nepavyko:</b> <code>{error}</code>\n\nJei klaidos pranešime rašoma \"Access denied\", jūsų KryptoExpress API raktas neturi leidimo atlikti išmokėjimų: įgalinkite API rakto išmokėjimų leidimą (ir išmokėjimus jūsų paskyroje) paslaugų teikėjo valdymo skyde, tada bandykite dar kartą.",
     "crypto_wallet_line": "⚖️ {crypto_name} Balansas: <code>{crypto_balance:.8f}</code> {crypto_name}",
     "deposits_statistics_msg": "📊 <b>Įmokų statistika per pastaruosius {timedelta}.\n\n💸 Iš viso įmokų: {deposits_count}\n\n{deposits_content}\n\n💼 Iš viso kriptovaliutos įmokų suma: {fiat_amount:.2f} {currency_text}</b>",
     "deposits_statistics_line": "💰 Iš viso {crypto_name} įmokų suma: {crypto_amount:.8f} {crypto_name}",

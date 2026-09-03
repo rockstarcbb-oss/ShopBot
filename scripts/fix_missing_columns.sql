@@ -1,5 +1,21 @@
 -- Fix missing columns across ShopBot tables (idempotent for PostgreSQL)
 
+-- Heal missing enum values of the cryptocurrency type: databases created by
+-- older versions predate some coins, so inserting such a deposit failed with
+-- "invalid input value for enum cryptocurrency"
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'BNB';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'BTC';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'DOGE';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'LTC';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'ETH';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'SOL';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'USDT_SOL';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'USDC_SOL';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'USDT_ERC20';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'USDC_ERC20';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'USDT_BEP20';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'USDC_BEP20';
+
 -- items
 ALTER TABLE items ADD COLUMN IF NOT EXISTS delivery_image VARCHAR;
 ALTER TABLE items ADD COLUMN IF NOT EXISTS item_type VARCHAR(8) DEFAULT 'DIGITAL';
@@ -18,8 +34,10 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS top_up_amount FLOAT DEFAULT 0.0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS consume_records FLOAT DEFAULT 0.0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS registered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS can_receive_messages BOOLEAN DEFAULT TRUE;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS language VARCHAR(2) DEFAULT 'en';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
+-- NOTE: the ORM (SQLAlchemy Enum) persists the enum member NAME ('EN'), not the
+-- value ('en'); a lowercase default would be unreadable by the ORM.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS language VARCHAR NOT NULL DEFAULT 'EN';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(8);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by_user_id INTEGER;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_at TIMESTAMP WITH TIME ZONE;
@@ -36,8 +54,10 @@ ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS media_id VARCHAR DEFAULT '';
 ALTER TABLE deposits ADD COLUMN IF NOT EXISTS user_id INTEGER;
 ALTER TABLE deposits ADD COLUMN IF NOT EXISTS network VARCHAR(10);
 ALTER TABLE deposits ADD COLUMN IF NOT EXISTS amount NUMERIC(78, 0);
+-- Widen the amount precision on older deployments (idempotent).
+ALTER TABLE deposits ALTER COLUMN amount TYPE NUMERIC(78, 0);
 ALTER TABLE deposits ADD COLUMN IF NOT EXISTS deposit_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE deposits ADD COLUMN IF NOT EXISTS fiat_amount FLOAT DEFAULT 0.0;
+ALTER TABLE deposits ADD COLUMN IF NOT EXISTS fiat_amount DOUBLE PRECISION NOT NULL DEFAULT 0;
 
 -- buys
 ALTER TABLE buys ADD COLUMN IF NOT EXISTS buyer_id INTEGER;
@@ -45,17 +65,29 @@ ALTER TABLE buys ADD COLUMN IF NOT EXISTS total_price FLOAT;
 ALTER TABLE buys ADD COLUMN IF NOT EXISTS buy_datetime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE buys ADD COLUMN IF NOT EXISTS status VARCHAR(9) DEFAULT 'COMPLETED';
 ALTER TABLE buys ADD COLUMN IF NOT EXISTS coupon_id INTEGER;
-ALTER TABLE buys ADD COLUMN IF NOT EXISTS discount FLOAT DEFAULT 0.0;
+ALTER TABLE buys ADD COLUMN IF NOT EXISTS discount DOUBLE PRECISION NOT NULL DEFAULT 0.0;
 ALTER TABLE buys ADD COLUMN IF NOT EXISTS shipping_address VARCHAR;
 ALTER TABLE buys ADD COLUMN IF NOT EXISTS track_number VARCHAR;
 ALTER TABLE buys ADD COLUMN IF NOT EXISTS shipping_option_id INTEGER;
 
+-- item type enum (created before any column that uses it)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'itemtype') THEN
+        CREATE TYPE itemtype AS ENUM ('DIGITAL', 'PHYSICAL');
+    END IF;
+END
+$$;
+
 -- cart_items
 ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS cart_id INTEGER;
-ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS item_type VARCHAR(8) DEFAULT 'DIGITAL';
+ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS item_type itemtype NOT NULL DEFAULT 'DIGITAL';
 ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS category_id INTEGER;
 ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS subcategory_id INTEGER;
 ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS quantity INTEGER;
+
+-- buyItem (the camelCase table name must be quoted)
+ALTER TABLE "buyItem" ADD COLUMN IF NOT EXISTS item_ids INTEGER[] NOT NULL DEFAULT '{}'::integer[];
 
 -- coupons
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS name VARCHAR;

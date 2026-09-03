@@ -1,8 +1,40 @@
-import pytest
-from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine, inspect, text
+import logging
+from types import SimpleNamespace
 
+import pytest
+import sqlalchemy
+from sqlalchemy import Column, Enum as SAEnum, Integer, MetaData, String, Table, create_engine, inspect, text
+from sqlalchemy.orm import sessionmaker
+
+# sqlite has no ARRAY type: alias it to JSON so that ORM models using
+# ARRAY columns (buyItem.item_ids) can be imported/inspected on sqlite.
+sqlalchemy.ARRAY = sqlalchemy.JSON
+
+from enums.cryptocurrency import Cryptocurrency
+from enums.item_type import ItemType
+from enums.language import Language
 from models.base import Base
-from utils.schema_sync import add_missing_columns_safe, sync_missing_columns_sync
+from models.item import Item
+from models.user import User
+
+# Import every model so Base.metadata and the mapper registry are complete
+# regardless of which other test modules were collected before this one.
+import models.button_media  # noqa: F401
+import models.buy  # noqa: F401
+import models.buyItem  # noqa: F401
+import models.cart  # noqa: F401
+import models.cartItem  # noqa: F401
+import models.category  # noqa: F401
+import models.coupon  # noqa: F401
+import models.deposit  # noqa: F401
+import models.payment  # noqa: F401
+import models.referral  # noqa: F401
+import models.review  # noqa: F401
+import models.shipping_option  # noqa: F401
+import models.subcategory  # noqa: F401
+
+from utils.schema_sync import (_sync_enum_values, add_missing_columns,
+                               add_missing_columns_safe, sync_missing_columns_sync)
 
 
 def test_sync_missing_columns_adds_new_columns():
@@ -120,3 +152,195 @@ async def test_schema_sync_with_base_models():
     assert "is_sold" in items_cols
     assert "is_banned" in users_cols
     assert "language" in users_cols
+
+
+@pytest.mark.asyncio
+async def test_add_missing_columns_heals_items_without_delivery_image(caplog):
+    """An 'old' items table without delivery_image gets the column back-filled
+    and the ORM can insert items again afterwards."""
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE items (
+                id INTEGER PRIMARY KEY,
+                item_type VARCHAR(10) NOT NULL,
+                category_id INTEGER NOT NULL,
+                subcategory_id INTEGER NOT NULL,
+                private_data VARCHAR,
+                price FLOAT NOT NULL,
+                is_sold BOOLEAN NOT NULL,
+                is_new BOOLEAN NOT NULL,
+                description VARCHAR NOT NULL
+            )
+        """))
+
+    with caplog.at_level(logging.WARNING, logger="utils.schema_sync"):
+        with engine.begin() as conn:
+            added = add_missing_columns(conn, Base.metadata)
+
+    assert "items.delivery_image" in added
+    inspector = inspect(engine)
+    assert "delivery_image" in {c["name"] for c in inspector.get_columns("items")}
+    assert any("Schema sync applied" in record.message for record in caplog.records)
+
+    # the ORM can insert items again
+    session_factory = sessionmaker(bind=engine)
+    with session_factory() as session:
+        session.add(Item(item_type=ItemType.DIGITAL,
+                         category_id=1,
+                         subcategory_id=1,
+                         price=5.0,
+                         description="1 month of premium",
+                         private_data="CODE-0001",
+                         delivery_image="photo-0001"))
+        session.commit()
+        stored = session.query(Item).one()
+        assert stored.private_data == "CODE-0001"
+        assert stored.delivery_image == "photo-0001"
+        assert stored.is_sold is False
+
+
+def test_add_missing_columns_is_idempotent_on_real_models():
+    """A second sync run must not apply anything."""
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE items (
+                id INTEGER PRIMARY KEY,
+                item_type VARCHAR(10) NOT NULL,
+                category_id INTEGER NOT NULL,
+                subcategory_id INTEGER NOT NULL,
+                private_data VARCHAR,
+                price FLOAT NOT NULL,
+                is_sold BOOLEAN NOT NULL,
+                is_new BOOLEAN NOT NULL,
+                description VARCHAR NOT NULL
+            )
+        """))
+
+    with engine.begin() as conn:
+        first_run = add_missing_columns(conn, Base.metadata)
+    assert first_run != []
+
+    with engine.begin() as conn:
+        second_run = add_missing_columns(conn, Base.metadata)
+    assert second_run == []
+
+
+def test_add_missing_columns_users_referral_columns_with_defaults():
+    """A 'old' users table gets language/is_banned/referral columns with working
+    defaults and the ORM can insert users afterwards."""
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                telegram_username VARCHAR,
+                telegram_id BIGINT NOT NULL,
+                top_up_amount FLOAT,
+                consume_records FLOAT,
+                registered_at TIMESTAMP,
+                can_receive_messages BOOLEAN
+            )
+        """))
+
+    with engine.begin() as conn:
+        added = add_missing_columns(conn, Base.metadata)
+
+    assert {"users.language",
+            "users.is_banned",
+            "users.referral_code",
+            "users.referred_by_user_id",
+            "users.referred_at"} <= set(added)
+
+    # database-level default works for the NOT NULL language column
+    # (is_banned is nullable in the model, so no DB default is required:
+    # the ORM supplies False client-side)
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO users (telegram_id) VALUES (555)"))
+        row = conn.execute(text(
+            "SELECT language FROM users WHERE telegram_id = 555")).one()
+    assert row.language == Language.EN.name  # SQLAlchemy persists enum member names
+
+    # the ORM can insert users again
+    session_factory = sessionmaker(bind=engine)
+    with session_factory() as session:
+        session.add(User(telegram_id=777))
+        session.commit()
+        stored = session.query(User).filter(User.telegram_id == 777).one()
+        assert stored.language == Language.EN
+        assert stored.is_banned is False
+        assert stored.referral_code is None
+        assert stored.referred_by_user_id is None
+
+
+class _FakePGDialect:
+    name = "postgresql"
+
+    def __init__(self):
+        self.identifier_preparer = SimpleNamespace(quote=lambda name: '"%s"' % name)
+
+
+class _FakePGConnection:
+    """Minimal stand-in for a sqlalchemy Connection on PostgreSQL: answers the
+    pg_enum/pg_type lookup with `existing_enum_values` and records every DDL."""
+
+    def __init__(self, existing_enum_values):
+        self.dialect = _FakePGDialect()
+        self._existing_enum_values = existing_enum_values
+        self.executed_ddl = []
+
+    def execute(self, statement, params=None):
+        if params is not None:  # the pg_enum lookup query
+            rows = [(value,) for value in self._existing_enum_values]
+            return SimpleNamespace(fetchall=lambda: rows)
+        self.executed_ddl.append(str(statement))
+        return None
+
+
+def test_sync_enum_values_adds_only_missing_values():
+    column = Column("network", SAEnum("BTC", "LTC", "SOL", "USDT_SOL", name="cryptocurrency"))
+    connection = _FakePGConnection({"BTC", "LTC"})
+
+    applied = _sync_enum_values(connection, column)
+
+    assert applied == [
+        'ALTER TYPE "cryptocurrency" ADD VALUE IF NOT EXISTS \'SOL\'',
+        'ALTER TYPE "cryptocurrency" ADD VALUE IF NOT EXISTS \'USDT_SOL\'',
+    ]
+    assert connection.executed_ddl == applied
+
+
+def test_sync_enum_values_noop_when_all_values_exist():
+    column = Column("network", SAEnum("BTC", "LTC", name="cryptocurrency"))
+    connection = _FakePGConnection({"BTC", "LTC"})
+
+    assert _sync_enum_values(connection, column) == []
+    assert connection.executed_ddl == []
+
+
+def test_add_missing_columns_heals_existing_enum_values(monkeypatch):
+    """A 'deposits' table whose columns all exist still gets the network
+    column's enum VALUES healed (older DB predates some coins)."""
+    deposit_columns = ["id", "user_id", "network", "amount", "deposit_datetime", "fiat_amount"]
+
+    class _FakeInspector:
+        def __init__(self, conn):
+            pass
+
+        def get_table_names(self):
+            return ["deposits"]
+
+        def get_columns(self, table_name):
+            return [{"name": name} for name in deposit_columns]
+
+    monkeypatch.setattr("utils.schema_sync.inspect", _FakeInspector)
+
+    connection = _FakePGConnection({"BTC", "LTC"})
+    applied = add_missing_columns(connection, Base.metadata)
+
+    expected = ['ALTER TYPE "cryptocurrency" ADD VALUE IF NOT EXISTS \'%s\'' % value
+                for value in SAEnum(Cryptocurrency).enums
+                if value not in {"BTC", "LTC"}]
+    assert applied == expected
+    assert connection.executed_ddl == expected

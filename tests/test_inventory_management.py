@@ -1,3 +1,5 @@
+from pathlib import Path
+from shutil import copytree
 from types import SimpleNamespace
 
 import pytest
@@ -69,6 +71,8 @@ async def test_price_step_creates_items_when_bot_photo_cache_missing(monkeypatch
         return None
 
     monkeypatch.chdir(tmp_path)  # static/no_image.jpeg does not exist
+    # Localizator reads ./i18n relative to CWD: keep a copy available
+    copytree(Path(__file__).resolve().parent.parent / "i18n", tmp_path / "i18n")
     monkeypatch.setattr("services.inventory_management.CategoryRepository.get_or_create",
                         _fake_category_get_or_create)
     monkeypatch.setattr("services.inventory_management.SubcategoryRepository.get_or_create",
@@ -228,3 +232,79 @@ async def test_delivery_image_single_line_keeps_original_prompt(monkeypatch):
     assert len(added_items) == 1
     assert added_items[0].private_data == "CODE-AAAA"
     assert added_items[0].delivery_image is None
+
+
+@pytest.mark.asyncio
+async def test_delivery_image_photo_per_line_walkthrough(monkeypatch):
+    """Codes -> photo(1) -> invalid text re-prompt -> skip -> photo(3) -> price:
+    each created item carries the delivery image of its own line."""
+    added_items = []
+    _fake_add_item_dependencies(monkeypatch, added_items)
+
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage, key=StorageKey(chat_id=1, user_id=1, bot_id=1))
+    await _build_private_data_state(state)
+
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        _FakeMessage("CODE-1\nCODE-2\nCODE-3"), state, session=None, language=Language.EN)
+    assert await state.get_state() == InventoryManagementStates.delivery_image
+    assert "1 of 3" in msg
+
+    photo_1 = _FakeMessage(None, photo=[SimpleNamespace(file_id="photo-1")])
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        photo_1, state, session=None, language=Language.EN)
+    assert "2 of 3" in msg
+
+    # invalid input re-prompts the SAME line
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        _FakeMessage("not an image"), state, session=None, language=Language.EN)
+    assert "2 of 3" in msg
+
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        _FakeMessage("skip"), state, session=None, language=Language.EN)
+    assert "3 of 3" in msg
+
+    photo_3 = _FakeMessage(None, photo=[SimpleNamespace(file_id="photo-3")])
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        photo_3, state, session=None, language=Language.EN)
+    assert await state.get_state() == InventoryManagementStates.price
+
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        _FakeMessage("50"), state, session=None, language=Language.EN)
+    assert len(added_items) == 3
+    assert [item.private_data for item in added_items] == ["CODE-1", "CODE-2", "CODE-3"]
+    assert [item.delivery_image for item in added_items] == ["photo-1", None, "photo-3"]
+    assert await state.get_state() is None  # state cleared
+
+
+@pytest.mark.asyncio
+async def test_delivery_image_single_shared_image_applied_to_every_line(monkeypatch):
+    """Backward compatibility: old sessions (JSON/TXT flows, in-flight menu flows)
+    store one shared delivery_image and no per-line list - every line gets it."""
+    added_items = []
+    _fake_add_item_dependencies(monkeypatch, added_items)
+
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage, key=StorageKey(chat_id=1, user_id=1, bot_id=1))
+    await state.set_state(InventoryManagementStates.price)
+    await state.set_data({
+        "add_type": "menu",
+        "item_type": "DIGITAL",
+        "category_name": "Accounts",
+        "subcategory_name": "Streaming",
+        "description": "1 month premium",
+        "private_data": "CODE-1\nCODE-2",
+        "delivery_image": "shared-image",
+        "chat_id": 1,
+        "msg_id": 1,
+    })
+
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        _FakeMessage("50"), state, session=None, language=Language.EN)
+
+    assert len(added_items) == 2
+    assert added_items[0].private_data == "CODE-1"
+    assert added_items[1].private_data == "CODE-2"
+    assert added_items[0].delivery_image == "shared-image"
+    assert added_items[1].delivery_image == "shared-image"
+    assert await state.get_state() is None
