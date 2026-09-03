@@ -2,9 +2,8 @@ import logging
 import sys
 import traceback
 from contextlib import asynccontextmanager
-from pathlib import Path
 from aiogram.fsm.storage.redis import RedisStorage
-from aiogram.types import BufferedInputFile, URLInputFile
+from aiogram.types import BufferedInputFile
 from redis.asyncio import Redis
 from sqladmin import Admin
 
@@ -47,27 +46,7 @@ dp = Dispatcher(storage=RedisStorage(redis))
 
 async def _startup() -> None:
     await create_db_and_tables()
-    static = Path("static")
-    if static.exists() is False:
-        static.mkdir()
-    me = await bot.get_me()
-    photos = await bot.get_user_profile_photos(me.id)
-    if photos.total_count == 0:
-        photo_id_list = []
-        for admin_id in config.ADMIN_ID_LIST:
-            try:
-                msg = await bot.send_photo(chat_id=admin_id,
-                                           photo=URLInputFile(url="https://img.freepik.com/premium-vector/no-photo-available-vector-icon-default-image-symbol-picture-coming-soon-web-site-mobile-app_87543-18055.jpg",
-                                                              filename="no_image.png"))
-                bot_photo_id = msg.photo[-1].file_id
-                photo_id_list.append(bot_photo_id)
-            except Exception as _:
-                pass
-        bot_photo_id = photo_id_list[0]
-    else:
-        bot_photo_id = photos.photos[0][-1].file_id
-    with open("static/no_image.jpeg", "w") as f:
-        f.write(bot_photo_id)
+    await MediaService.ensure_bot_photo(bot)
     await MediaService.update_inaccessible_media(bot)
     validate_i18n()
     await ButtonMediaRepository.init_buttons_media()
