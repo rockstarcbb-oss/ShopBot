@@ -349,11 +349,13 @@ class CartService:
                              shipping_option_id=shipping_option.id if shipping_option else None,
                              status=BuyStatus.PAID if shipping_option else BuyStatus.COMPLETED)
             buy_dto = await BuyRepository.create(buy_dto, session)
+            purchased_for_delivery = []
             for cart_item in cart_items:
                 purchased_items = await ItemRepository.get_purchased_items(cart_item.item_type,
                                                                            cart_item.category_id,
                                                                            cart_item.subcategory_id, cart_item.quantity,
                                                                            session)
+                purchased_for_delivery.extend(purchased_items)
                 item_ids = [item.id for item in purchased_items]
                 buy_item_dto = BuyItemDTO(buy_id=buy_dto.id, item_ids=item_ids)
                 await BuyItemRepository.create_single(buy_item_dto, session)
@@ -374,6 +376,7 @@ class CartService:
             await UserRepository.update(user, session)
             await session_commit(session)
             await NotificationService.new_buy(buy_dto, user, session)
+            await NotificationService.deliver_digital_items(user.telegram_id, purchased_for_delivery, language)
             return msg, kb_builder
         elif callback_data.confirmation is False:
             kb_builder.row(callback_data.get_back_button(language, 0))

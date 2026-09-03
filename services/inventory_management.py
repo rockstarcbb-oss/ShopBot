@@ -16,6 +16,7 @@ from models.item import ItemDTO
 from repositories.category import CategoryRepository
 from repositories.item import ItemRepository
 from repositories.subcategory import SubcategoryRepository
+from services.message import MessageService
 from services.notification import NotificationService
 from utils.utils import get_text
 
@@ -149,19 +150,26 @@ class InventoryManagementService:
             else:
                 msg = get_text(language, BotEntity.ADMIN, "add_items_private_data")
         elif current_state == InventoryManagementStates.private_data:
-            success_msg = get_text(language, BotEntity.ADMIN, "add_items_price").format(
-                    currency_text=config.CURRENCY.get_localized_text())
+            price_msg = InventoryManagementService._price_prompt(language)
             if ItemType(state_data['item_type'].upper()) == ItemType.PHYSICAL:
                 if message.html_text.isdecimal():
                     await state.update_data(items_qty=int(message.html_text))
                     await state.set_state(InventoryManagementStates.price)
-                    msg = success_msg
+                    msg = price_msg
                 else:
                     msg = get_text(language, BotEntity.ADMIN, "add_items_private_data_physical")
             else:
                 await state.update_data(private_data=message.html_text)
+                await state.set_state(InventoryManagementStates.delivery_image)
+                msg = get_text(language, BotEntity.ADMIN, "add_items_delivery_image")
+        elif current_state == InventoryManagementStates.delivery_image:
+            delivery_image = InventoryManagementService._extract_delivery_image(message)
+            if delivery_image is False:
+                msg = get_text(language, BotEntity.ADMIN, "add_items_delivery_image")
+            else:
+                await state.update_data(delivery_image=delivery_image)
                 await state.set_state(InventoryManagementStates.price)
-                msg = success_msg
+                msg = InventoryManagementService._price_prompt(language)
         else:
             try:
                 price = float(message.html_text)
@@ -171,20 +179,23 @@ class InventoryManagementService:
                 item_type = ItemType(state_data['item_type'].upper())
                 category = await CategoryRepository.get_or_create(state_data['category_name'], session)
                 subcategory = await SubcategoryRepository.get_or_create(state_data['subcategory_name'], session)
+                delivery_image = state_data.get('delivery_image')
                 if item_type == ItemType.PHYSICAL:
                     items_list = [ItemDTO(item_type=item_type,
                                           category_id=category.id,
                                           subcategory_id=subcategory.id,
                                           description=state_data['description'],
                                           price=float(state_data['price']),
-                                          private_data=None) for _ in range(state_data['items_qty'])]
+                                          private_data=None,
+                                          delivery_image=None) for _ in range(state_data['items_qty'])]
                 else:
                     items_list = [ItemDTO(item_type=item_type,
                                           category_id=category.id,
                                           subcategory_id=subcategory.id,
                                           description=state_data['description'],
                                           price=float(state_data['price']),
-                                          private_data=private_data) for private_data in
+                                          private_data=private_data,
+                                          delivery_image=delivery_image) for private_data in
                                   state_data['private_data'].split('\n')]
                 await ItemRepository.add_many(items_list, session)
                 await session_commit(session)
@@ -192,7 +203,22 @@ class InventoryManagementService:
                 msg = get_text(language, BotEntity.ADMIN, "add_items_success").format(adding_result=len(items_list))
                 cancel_button.text = get_text(language, BotEntity.COMMON, "back_button")
             except Exception as _:
-                msg = get_text(language, BotEntity.ADMIN, "add_items_price").format(
-                    currency_text=config.CURRENCY.get_localized_text())
+                msg = InventoryManagementService._price_prompt(language)
         kb_builder.row(cancel_button)
         return msg, kb_builder
+
+    @staticmethod
+    def _price_prompt(language: Language) -> str:
+        return get_text(language, BotEntity.ADMIN, "add_items_price").format(
+            currency_text=config.CURRENCY.get_localized_text())
+
+    @staticmethod
+    def _extract_delivery_image(message: Message) -> str | None | bool:
+        if message.photo:
+            return message.photo[-1].file_id
+        text = (message.text or message.html_text or "").strip()
+        if MessageService.is_skip_delivery_image(text):
+            return None
+        if text.startswith("http://") or text.startswith("https://"):
+            return text
+        return False

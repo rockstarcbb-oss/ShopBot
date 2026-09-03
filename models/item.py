@@ -17,6 +17,7 @@ class Item(Base):
     subcategory_id = Column(Integer, ForeignKey("subcategories.id", ondelete="CASCADE"), nullable=False)
     subcategory = relationship("Subcategory", back_populates="items")
     private_data = Column(String, nullable=True, unique=False)
+    delivery_image = Column(String, nullable=True)
     price = Column(Float, nullable=False)
     is_sold = Column(Boolean, nullable=False, default=False)
     is_new = Column(Boolean, nullable=False, default=True)
@@ -38,6 +39,7 @@ class ItemDTO(BaseModel):
     subcategory_id: int | None = None
     subcategory_name: str | None = None
     private_data: str | None = None
+    delivery_image: str | None = None
     price: float | None = None
     is_sold: bool | None = None
     is_new: bool | None = None
@@ -56,6 +58,7 @@ class ItemAvailabilityDTO(BaseModel):
 class ItemAdmin(ModelView, model=Item):
     column_exclude_list = [Item.category_id, Item.subcategory_id]
     column_formatters = {Item.private_data: lambda m, a: f"{m.private_data[:20]}..." if m.private_data else "",
+                         Item.delivery_image: lambda m, a: f"{m.delivery_image[:20]}..." if m.delivery_image else "",
                          Item.description: lambda m, a: f"{m.description[:20]}..."}
     column_searchable_list = [Item.private_data]
     column_sortable_list = [Item.id,

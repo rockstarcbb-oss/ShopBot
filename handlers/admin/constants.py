@@ -35,6 +35,7 @@ class InventoryManagementStates(StatesGroup):
     description = State()
     price = State()
     private_data = State()
+    delivery_image = State()
     filter_entity = State()
 
 

@@ -141,6 +141,37 @@ class MultibotService:
         return success_count
 
     @staticmethod
+    async def send_photo_to_user(photo: str,
+                                 telegram_id: int,
+                                 caption: str | None = None,
+                                 reply_markup=None,
+                                 redis_client: Redis | None = None) -> int:
+        success_count = 0
+        tokens = await MultibotService.get_all_tokens_with_main(redis_client)
+        for index, token in enumerate(tokens):
+            bot = MultibotService.build_bot(token)
+            try:
+                await bot.send_photo(
+                    chat_id=telegram_id,
+                    photo=photo,
+                    caption=caption,
+                    reply_markup=reply_markup
+                )
+                success_count += 1
+            except TelegramForbiddenError as exception:
+                logging.error(f"TelegramForbiddenError: {exception.message}")
+            except TelegramUnauthorizedError:
+                logging.warning("Removing unauthorized child bot token during send_photo_to_user")
+                await MultibotService.remove_token(token, redis_client)
+            except Exception as exception:
+                logging.error(exception)
+            finally:
+                await bot.session.close()
+            if index < len(tokens) - 1:
+                await asyncio.sleep(MultibotService.SEND_DELAY_SECONDS)
+        return success_count
+
+    @staticmethod
     async def copy_message_to_user(from_chat_id: int,
                                    message_id: int,
                                    telegram_id: int,

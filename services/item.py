@@ -1,5 +1,4 @@
 from json import load
-from pathlib import Path
 
 from aiogram.types import InputMediaPhoto
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -7,8 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 import config
-from callbacks import AddType, AllCategoriesCallback
+from callbacks import AllCategoriesCallback
 from db import session_commit
+from enums.add_type import AddType
 from enums.announcement_type import AnnouncementType
 from enums.bot_entity import BotEntity
 from enums.item_type import ItemType
@@ -20,6 +20,7 @@ from repositories.category import CategoryRepository
 from repositories.item import ItemRepository
 from repositories.subcategory import SubcategoryRepository
 from services.media import MediaService
+from services.message import MessageService
 from utils.utils import get_text
 
 
@@ -131,7 +132,10 @@ class ItemService:
                 item.pop('category')
                 item.pop('subcategory')
                 if item_type == ItemType.PHYSICAL:
-                    item.pop('private_data')
+                    item.pop('private_data', None)
+                    item.pop('delivery_image', None)
+                elif not item.get('delivery_image'):
+                    item['delivery_image'] = None
                 items_list.append(ItemDTO(
                     item_type=item_type,
                     category_id=category.id,
@@ -146,10 +150,18 @@ class ItemService:
             lines = file.readlines()
             items_list = []
             for line in lines:
-                item_type, category_name, subcategory_name, description, price, private_data = line.split(';')
+                raw_line = line.strip()
+                if not raw_line:
+                    continue
+                parts = raw_line.split(';')
+                item_type, category_name, subcategory_name, description, price, private_data = parts[:6]
+                delivery_image = parts[6] if len(parts) > 6 else None
+                if MessageService.is_skip_delivery_image(delivery_image):
+                    delivery_image = None
                 item_type = ItemType(item_type.upper())
                 if item_type == ItemType.PHYSICAL:
                     private_data = None
+                    delivery_image = None
                 category = await CategoryRepository.get_or_create(category_name, session)
                 subcategory = await SubcategoryRepository.get_or_create(subcategory_name, session)
                 items_list.append(ItemDTO(
@@ -158,9 +170,30 @@ class ItemService:
                     subcategory_id=subcategory.id,
                     price=float(price),
                     description=description,
-                    private_data=private_data
+                    private_data=private_data,
+                    delivery_image=delivery_image
                 ))
             return items_list
+
+    @staticmethod
+    async def add_items(path_to_file: str,
+                        add_type: AddType,
+                        session: AsyncSession | Session,
+                        language: Language) -> str:
+        try:
+            if add_type == AddType.JSON:
+                items_list = await ItemService.parse_items_json(path_to_file, session)
+            else:
+                items_list = await ItemService.parse_items_txt(path_to_file, session)
+            await ItemRepository.add_many(items_list, session)
+            await session_commit(session)
+            return get_text(language, BotEntity.ADMIN, "add_items_success").format(
+                adding_result=len(items_list)
+            )
+        except Exception as exception:
+            return get_text(language, BotEntity.ADMIN, "add_items_err").format(
+                adding_result=exception
+            )
 
     @staticmethod
     async def get_all_types(callback_data: AllCategoriesCallback,
