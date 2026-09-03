@@ -66,9 +66,9 @@ class UserService:
                           callback_data=MyProfileCallback.create(level=1))
         kb_builder.button(text=get_text(language, BotEntity.USER, "purchase_history_button"),
                           callback_data=MyProfileCallback.create(level=3))
-        kb_builder.button(text=get_text(Language.EN, BotEntity.USER, "referral_button"),
+        kb_builder.button(text=get_text(language, BotEntity.USER, "referral_button"),
                           callback_data=MyProfileCallback.create(level=7))
-        kb_builder.button(text=get_text(Language.EN, BotEntity.USER, "language"),
+        kb_builder.button(text=get_text(language, BotEntity.USER, "language"),
                           callback_data=MyProfileCallback.create(level=6))
         kb_builder.adjust(2)
         user = await UserRepository.get_by_tgid(telegram_id, session)
@@ -150,7 +150,7 @@ class UserService:
             msg = get_text(default_language, BotEntity.USER, "edit_language")
             for language_object in Language:
                 kb_builder.button(
-                    text=f"{language_object.get_flag_emoji()} {language_object.name}",
+                    text=language_object.name,
                     callback_data=callback_data.model_copy(update={"language": language_object})
                 )
             kb_builder.row(callback_data.get_back_button(default_language, 0))
