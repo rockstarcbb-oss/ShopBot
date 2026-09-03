@@ -97,8 +97,17 @@ async def pick_shipping_option(**kwargs):
                                                               UserStates.shipping_address))
 async def receive_purchase_details(message: Message, state: FSMContext, session: AsyncSession, language: Language):
     media, kb_builder = await CartService.receive_purchase_details(message, state, session, language)
-    message = await NotificationService.answer_media(message, media, kb_builder.as_markup())
-    await state.update_data(msg_id=message.message_id, chat_id=message.chat.id)
+    if hasattr(media, "caption") and media.caption and "https://" in media.caption and (".png" in media.caption or ".jpg" in media.caption or ".jpeg" in media.caption):
+        words = media.caption.split()
+        photo_url = next((w for w in words if w.startswith("https://")), None)
+        if photo_url:
+            clean_text = media.caption.replace(photo_url, "").strip()
+            sent_msg = await message.answer_photo(photo=photo_url, caption=clean_text, reply_markup=kb_builder.as_markup())
+        else:
+            sent_msg = await NotificationService.answer_media(message, media, kb_builder.as_markup())
+    else:
+        sent_msg = await NotificationService.answer_media(message, media, kb_builder.as_markup())
+    await state.update_data(msg_id=sent_msg.message_id, chat_id=sent_msg.chat.id)
 
 
 @cart_router.callback_query(CartCallback.filter(), IsUserExistFilter())
