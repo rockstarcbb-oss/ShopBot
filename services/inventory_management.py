@@ -1,3 +1,5 @@
+import asyncio
+import html
 import logging
 
 from aiogram.fsm.context import FSMContext
@@ -21,6 +23,18 @@ from repositories.subcategory import SubcategoryRepository
 from services.message import MessageService
 from services.notification import NotificationService
 from utils.utils import get_text
+
+# One lock per chat so that photo albums (several photos arriving as separate
+# concurrent updates) are assigned to code lines strictly in order.
+_CHAT_LOCKS: dict[int, asyncio.Lock] = {}
+
+
+def _get_chat_lock(chat_id: int) -> asyncio.Lock:
+    lock = _CHAT_LOCKS.get(chat_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _CHAT_LOCKS[chat_id] = lock
+    return lock
 
 
 class InventoryManagementService:
@@ -124,6 +138,16 @@ class InventoryManagementService:
                             state: FSMContext,
                             session: AsyncSession,
                             language: Language) -> tuple[str, InlineKeyboardBuilder]:
+        # Serialize updates per chat: a photo album arrives as several concurrent
+        # messages and each one must be appended to the delivery image list in order.
+        async with _get_chat_lock(message.chat.id):
+            return await InventoryManagementService._process_add_item_menu(message, state, session, language)
+
+    @staticmethod
+    async def _process_add_item_menu(message: Message,
+                                     state: FSMContext,
+                                     session: AsyncSession,
+                                     language: Language) -> tuple[str, InlineKeyboardBuilder]:
         current_state = await state.get_state()
         state_data = await state.get_data()
         await NotificationService.edit_reply_markup(message.bot,
@@ -161,17 +185,35 @@ class InventoryManagementService:
                 else:
                     msg = get_text(language, BotEntity.ADMIN, "add_items_private_data_physical")
             else:
-                await state.update_data(private_data=message.html_text)
-                await state.set_state(InventoryManagementStates.delivery_image)
-                msg = get_text(language, BotEntity.ADMIN, "add_items_delivery_image")
+                private_data_lines = [line.strip()
+                                      for line in message.html_text.split('\n')
+                                      if line.strip()]
+                if not private_data_lines:
+                    msg = get_text(language, BotEntity.ADMIN, "add_items_private_data")
+                else:
+                    await state.update_data(private_data=message.html_text,
+                                            private_data_lines=private_data_lines,
+                                            delivery_images=[])
+                    await state.set_state(InventoryManagementStates.delivery_image)
+                    state_data = await state.get_data()
+                    msg = InventoryManagementService._delivery_image_prompt(language, state_data)
         elif current_state == InventoryManagementStates.delivery_image:
             delivery_image = InventoryManagementService._extract_delivery_image(message)
             if delivery_image is False:
-                msg = get_text(language, BotEntity.ADMIN, "add_items_delivery_image")
+                msg = InventoryManagementService._delivery_image_prompt(language, state_data)
             else:
-                await state.update_data(delivery_image=delivery_image)
-                await state.set_state(InventoryManagementStates.price)
-                msg = InventoryManagementService._price_prompt(language)
+                lines = state_data.get('private_data_lines') or [
+                    line.strip() for line in (state_data.get('private_data') or '').split('\n') if line.strip()
+                ]
+                delivery_images = list(state_data.get('delivery_images') or [])
+                delivery_images.append(delivery_image)
+                await state.update_data(private_data_lines=lines, delivery_images=delivery_images)
+                if len(delivery_images) >= len(lines):
+                    await state.set_state(InventoryManagementStates.price)
+                    msg = InventoryManagementService._price_prompt(language)
+                else:
+                    state_data = await state.get_data()
+                    msg = InventoryManagementService._delivery_image_prompt(language, state_data)
         else:
             try:
                 price = float(message.html_text)
@@ -181,7 +223,6 @@ class InventoryManagementService:
                 item_type = ItemType(state_data['item_type'].upper())
                 category = await CategoryRepository.get_or_create(state_data['category_name'], session)
                 subcategory = await SubcategoryRepository.get_or_create(state_data['subcategory_name'], session)
-                delivery_image = state_data.get('delivery_image')
                 if item_type == ItemType.PHYSICAL:
                     items_list = [ItemDTO(item_type=item_type,
                                           category_id=category.id,
@@ -191,14 +232,25 @@ class InventoryManagementService:
                                           private_data=None,
                                           delivery_image=None) for _ in range(state_data['items_qty'])]
                 else:
+                    private_data_lines = state_data.get('private_data_lines') or [
+                        line.strip() for line in state_data['private_data'].split('\n') if line.strip()
+                    ]
+                    delivery_images = state_data.get('delivery_images')
+                    if delivery_images is None:
+                        # Legacy single-image flows: apply the same image to every line.
+                        delivery_images = [state_data.get('delivery_image')] * len(private_data_lines)
+                    delivery_images = list(delivery_images)
+                    if len(delivery_images) < len(private_data_lines):
+                        delivery_images.extend([None] * (len(private_data_lines) - len(delivery_images)))
                     items_list = [ItemDTO(item_type=item_type,
                                           category_id=category.id,
                                           subcategory_id=subcategory.id,
                                           description=state_data['description'],
                                           price=float(state_data['price']),
                                           private_data=private_data,
-                                          delivery_image=delivery_image) for private_data in
-                                  state_data['private_data'].split('\n')]
+                                          delivery_image=delivery_image)
+                                  for private_data, delivery_image in
+                                  zip(private_data_lines, delivery_images)]
                 await ItemRepository.add_many(items_list, session)
                 await session_commit(session)
                 await state.clear()
@@ -220,8 +272,24 @@ class InventoryManagementService:
             currency_text=config.CURRENCY.get_localized_text())
 
     @staticmethod
+    def _delivery_image_prompt(language: Language, state_data: dict) -> str:
+        lines = state_data.get('private_data_lines') or []
+        collected = state_data.get('delivery_images') or []
+        if len(lines) <= 1:
+            return get_text(language, BotEntity.ADMIN, "add_items_delivery_image")
+        current = min(len(collected) + 1, len(lines))
+        code_preview = html.escape(lines[current - 1])
+        if len(code_preview) > 100:
+            code_preview = code_preview[:100] + "…"
+        return get_text(language, BotEntity.ADMIN, "add_items_delivery_image_multi").format(
+            current=current,
+            total=len(lines),
+            code_preview=code_preview
+        )
+
+    @staticmethod
     def _extract_delivery_image(message: Message) -> str | None | bool:
-        if message.photo:
+        if getattr(message, "photo", None):
             return message.photo[-1].file_id
         text = (message.text or message.html_text or "").strip()
         if MessageService.is_skip_delivery_image(text):
