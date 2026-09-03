@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker, Session
 
 import config
 from models.base import Base
+from utils.schema_sync import add_missing_columns_safe
 
 """
 Imports of these models are needed to correctly create tables in the database.
@@ -104,3 +105,4 @@ async def create_db_and_tables():
         else:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+    await add_missing_columns_safe(engine)
