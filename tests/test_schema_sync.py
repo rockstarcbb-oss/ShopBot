@@ -1,14 +1,16 @@
 import logging
+from types import SimpleNamespace
 
 import pytest
 import sqlalchemy
-from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine, inspect, text
+from sqlalchemy import Column, Enum as SAEnum, Integer, MetaData, String, Table, create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 # sqlite has no ARRAY type: alias it to JSON so that ORM models using
 # ARRAY columns (buyItem.item_ids) can be imported/inspected on sqlite.
 sqlalchemy.ARRAY = sqlalchemy.JSON
 
+from enums.cryptocurrency import Cryptocurrency
 from enums.item_type import ItemType
 from enums.language import Language
 from models.base import Base
@@ -31,7 +33,8 @@ import models.review  # noqa: F401
 import models.shipping_option  # noqa: F401
 import models.subcategory  # noqa: F401
 
-from utils.schema_sync import add_missing_columns, add_missing_columns_safe, sync_missing_columns_sync
+from utils.schema_sync import (_sync_enum_values, add_missing_columns,
+                               add_missing_columns_safe, sync_missing_columns_sync)
 
 
 def test_sync_missing_columns_adds_new_columns():
@@ -269,3 +272,75 @@ def test_add_missing_columns_users_referral_columns_with_defaults():
         assert stored.is_banned is False
         assert stored.referral_code is None
         assert stored.referred_by_user_id is None
+
+
+class _FakePGDialect:
+    name = "postgresql"
+
+    def __init__(self):
+        self.identifier_preparer = SimpleNamespace(quote=lambda name: '"%s"' % name)
+
+
+class _FakePGConnection:
+    """Minimal stand-in for a sqlalchemy Connection on PostgreSQL: answers the
+    pg_enum/pg_type lookup with `existing_enum_values` and records every DDL."""
+
+    def __init__(self, existing_enum_values):
+        self.dialect = _FakePGDialect()
+        self._existing_enum_values = existing_enum_values
+        self.executed_ddl = []
+
+    def execute(self, statement, params=None):
+        if params is not None:  # the pg_enum lookup query
+            rows = [(value,) for value in self._existing_enum_values]
+            return SimpleNamespace(fetchall=lambda: rows)
+        self.executed_ddl.append(str(statement))
+        return None
+
+
+def test_sync_enum_values_adds_only_missing_values():
+    column = Column("network", SAEnum("BTC", "LTC", "SOL", "USDT_SOL", name="cryptocurrency"))
+    connection = _FakePGConnection({"BTC", "LTC"})
+
+    applied = _sync_enum_values(connection, column)
+
+    assert applied == [
+        'ALTER TYPE "cryptocurrency" ADD VALUE IF NOT EXISTS \'SOL\'',
+        'ALTER TYPE "cryptocurrency" ADD VALUE IF NOT EXISTS \'USDT_SOL\'',
+    ]
+    assert connection.executed_ddl == applied
+
+
+def test_sync_enum_values_noop_when_all_values_exist():
+    column = Column("network", SAEnum("BTC", "LTC", name="cryptocurrency"))
+    connection = _FakePGConnection({"BTC", "LTC"})
+
+    assert _sync_enum_values(connection, column) == []
+    assert connection.executed_ddl == []
+
+
+def test_add_missing_columns_heals_existing_enum_values(monkeypatch):
+    """A 'deposits' table whose columns all exist still gets the network
+    column's enum VALUES healed (older DB predates some coins)."""
+    deposit_columns = ["id", "user_id", "network", "amount", "deposit_datetime", "fiat_amount"]
+
+    class _FakeInspector:
+        def __init__(self, conn):
+            pass
+
+        def get_table_names(self):
+            return ["deposits"]
+
+        def get_columns(self, table_name):
+            return [{"name": name} for name in deposit_columns]
+
+    monkeypatch.setattr("utils.schema_sync.inspect", _FakeInspector)
+
+    connection = _FakePGConnection({"BTC", "LTC"})
+    applied = add_missing_columns(connection, Base.metadata)
+
+    expected = ['ALTER TYPE "cryptocurrency" ADD VALUE IF NOT EXISTS \'%s\'' % value
+                for value in SAEnum(Cryptocurrency).enums
+                if value not in {"BTC", "LTC"}]
+    assert applied == expected
+    assert connection.executed_ddl == expected

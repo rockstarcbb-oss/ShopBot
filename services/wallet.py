@@ -1,3 +1,4 @@
+import logging
 import re
 
 from aiogram.fsm.context import FSMContext
@@ -109,11 +110,17 @@ class WalletService:
                                    language: Language) -> tuple[str, InlineKeyboardBuilder]:
         state_data = await state.get_data()
         kb_builder = InlineKeyboardBuilder()
-        withdraw_dto = await CryptoApiWrapper.withdrawal(
-            callback_data.cryptocurrency,
-            state_data['to_address'],
-            False
-        )
+        try:
+            withdraw_dto = await CryptoApiWrapper.withdrawal(
+                callback_data.cryptocurrency,
+                state_data['to_address'],
+                False
+            )
+        except Exception as exc:
+            logging.exception("Withdrawal of %s failed", callback_data.cryptocurrency)
+            await state.clear()
+            kb_builder.row(AdminConstants.back_to_main_button(language))
+            return get_text(language, BotEntity.ADMIN, "crypto_withdrawal_failed").format(error=str(exc)), kb_builder
         withdraw_dto = WithdrawalDTO.model_validate(withdraw_dto, from_attributes=True)
         [kb_builder.button(
             text=get_text(language, BotEntity.ADMIN, "transaction"),

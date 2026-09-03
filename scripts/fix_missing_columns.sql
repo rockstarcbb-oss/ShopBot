@@ -1,5 +1,21 @@
 -- Fix missing columns across ShopBot tables (idempotent for PostgreSQL)
 
+-- Heal missing enum values of the cryptocurrency type: databases created by
+-- older versions predate some coins, so inserting such a deposit failed with
+-- "invalid input value for enum cryptocurrency"
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'BNB';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'BTC';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'DOGE';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'LTC';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'ETH';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'SOL';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'USDT_SOL';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'USDC_SOL';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'USDT_ERC20';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'USDC_ERC20';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'USDT_BEP20';
+ALTER TYPE cryptocurrency ADD VALUE IF NOT EXISTS 'USDC_BEP20';
+
 -- items
 ALTER TABLE items ADD COLUMN IF NOT EXISTS delivery_image VARCHAR;
 ALTER TABLE items ADD COLUMN IF NOT EXISTS item_type VARCHAR(8) DEFAULT 'DIGITAL';

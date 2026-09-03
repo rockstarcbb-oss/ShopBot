@@ -78,6 +78,37 @@ def _resolve_default_literal(connection: Connection, column: Column) -> str | No
     return None
 
 
+def _sync_enum_values(sync_connection: Connection, column: Column) -> list[str]:
+    """
+    PostgreSQL-only: make sure an existing enum TYPE knows every value the model
+    declares. A database created by an older code version has a 'cryptocurrency'
+    enum that predates some coins, which made inserts fail with
+    "invalid input value for enum" (e.g. deposits stuck with 500s).
+    Returns the list of applied ALTER TYPE statements.
+    """
+    if sync_connection.dialect.name != "postgresql":
+        return []
+    type_name = getattr(column.type, "name", None)
+    if not type_name:
+        return []
+    existing_rows = sync_connection.execute(
+        text("SELECT e.enumlabel FROM pg_enum e "
+             "JOIN pg_type t ON e.enumtypid = t.oid "
+             "WHERE t.typname = :type_name"),
+        {"type_name": type_name},
+    ).fetchall()
+    existing_values = {row[0] for row in existing_rows}
+    applied: list[str] = []
+    for value in column.type.enums:
+        if value in existing_values:
+            continue
+        ddl = f'ALTER TYPE "{type_name}" ADD VALUE IF NOT EXISTS \'{value}\''
+        sync_connection.execute(text(ddl))
+        applied.append(ddl)
+        logger.warning("Schema sync applied: %s", ddl)
+    return applied
+
+
 def add_missing_columns(sync_connection: Connection, metadata: MetaData | None = None) -> list[str]:
     """
     Additive-only schema sync: for every ORM table that already exists in the
@@ -86,9 +117,11 @@ def add_missing_columns(sync_connection: Connection, metadata: MetaData | None =
 
     PostgreSQL uses ``ADD COLUMN IF NOT EXISTS``; other dialects use a plain
     ``ADD COLUMN`` (existence is checked via the inspector first). For
-    PostgreSQL Enum columns the enum type is created first (``checkfirst``).
-    Nothing is ever dropped, renamed or type-altered. Returns the list of
-    "table.column" entries that were added.
+    PostgreSQL Enum columns the enum type is created first (``checkfirst``)
+    and missing enum VALUES are healed on already-existing enum columns
+    (older databases predate newer cryptocurrencies). Nothing is ever dropped,
+    renamed or type-altered. Returns the list of "table.column" entries that
+    were added (plus the applied enum ALTER statements).
     """
     if metadata is None:
         metadata = Base.metadata
@@ -106,12 +139,21 @@ def add_missing_columns(sync_connection: Connection, metadata: MetaData | None =
         existing_cols = {col["name"] for col in inspector.get_columns(table_name)}
         quoted_table = _quote(sync_connection, table_name)
         for column in table.columns:
-            if column.name in existing_cols or column.primary_key:
+            if column.name in existing_cols:
+                # The column itself already exists: nothing to add, but keep its
+                # PostgreSQL enum TYPE values current (additive-only).
+                if is_postgresql and isinstance(column.type, Enum):
+                    added_columns.extend(_sync_enum_values(sync_connection, column))
+                continue
+            if column.primary_key:
                 continue
             try:
                 if is_postgresql and isinstance(column.type, Enum):
                     # The enum type must exist before a column can reference it.
                     column.type.create(bind=sync_connection, checkfirst=True)
+                    # checkfirst=True skips creation when the type already exists
+                    # (possibly with outdated values), so sync its values too.
+                    added_columns.extend(_sync_enum_values(sync_connection, column))
                 column_type = _get_column_type(column, sync_connection.dialect)
                 not_null_sql = ""
                 default_sql = ""

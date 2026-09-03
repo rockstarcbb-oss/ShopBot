@@ -140,6 +140,7 @@
     "notification_new_deposit_id": "💰 New deposit by user with ID {telegram_id} for {currency_sym}{deposit_amount_fiat:.2f} with 💰 {value} {crypto_name}\n💰 Referral bonus: {currency_sym}{referral_bonus:.2f}\n💰 Referrer bonus: {currency_sym}{referrer_bonus:.2f}",
     "notification_new_deposit_username": "💰 New deposit by user with username @{username} for {currency_sym}{deposit_amount_fiat:.2f} with 💰 {value} {crypto_name}\n💰 Referral bonus: {currency_sym}{referral_bonus:.2f}\n💰 Referrer bonus: {currency_sym}{referrer_bonus:.2f}",
     "crypto_wallet": "\n\n<b>🤖 Bot balances\n\n{wallet_content}</b>",
+    "crypto_withdrawal_failed": "❌ <b>Withdrawal failed:</b> <code>{error}</code>\n\nIf the error says \"Access denied\", your KryptoExpress API key is not allowed to withdraw: enable the withdrawal permission for the API key (and withdrawals for your account) in the provider dashboard, then try again.",
     "crypto_wallet_line": "⚖️ {crypto_name} Balance: <code>{crypto_balance:.8f}</code> {crypto_name}",
     "deposits_statistics_msg": "📊 <b>Deposit statistics for the last {timedelta}.\n\n💸 Total deposits: {deposits_count}\n\n{deposits_content}\n\n💼 Total cryptocurrency deposits for the amount: {fiat_amount:.2f} {currency_text}</b>",
     "deposits_statistics_line": "💰 Total {crypto_name} deposits for the amount: {crypto_amount:.8f} {crypto_name}",
