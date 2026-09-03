@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -7,7 +8,7 @@ from sqlalchemy.orm import sessionmaker, Session
 
 import config
 from models.base import Base
-from utils.schema_sync import add_missing_columns_safe
+from utils.schema_sync import add_missing_columns
 
 """
 Imports of these models are needed to correctly create tables in the database.
@@ -105,4 +106,11 @@ async def create_db_and_tables():
         else:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
-    await add_missing_columns_safe(engine)
+    # Best-effort auto-heal for databases that predate the migrations:
+    # create_all() only creates missing tables, never missing columns.
+    # Never blocks startup: any failure here is logged and swallowed.
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(lambda sync_connection: add_missing_columns(sync_connection, Base.metadata))
+    except Exception:
+        logging.exception("Schema auto-heal failed; continuing startup with the existing schema")

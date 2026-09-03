@@ -51,6 +51,7 @@ def test_wallet_rejects_empty_address_without_exception():
 def test_wallet_validates_btc_addresses():
     # Legacy P2PKH (starts with 1)
     assert WalletService.validate_withdrawal_address("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", Cryptocurrency.BTC)
+    assert WalletService.validate_withdrawal_address("1BitcoinEaterAddressDontSendf59kuE", Cryptocurrency.BTC)
     # Legacy / Nested P2SH (starts with 3)
     assert WalletService.validate_withdrawal_address("3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", Cryptocurrency.BTC)
     # Native SegWit (Bech32)
@@ -63,14 +64,18 @@ def test_wallet_validates_btc_addresses():
 def test_wallet_validates_ltc_addresses():
     # Legacy P2PKH (starts with L)
     assert WalletService.validate_withdrawal_address("LQL9pVH1LsMfKwt82Y2wGhNGkrjF8BRFox", Cryptocurrency.LTC)
+    assert WalletService.validate_withdrawal_address("Lbu2oY3vxS5CdH87MW6PsWmpuDXb1zsn16", Cryptocurrency.LTC)
     # Legacy / P2SH (starts with M)
     assert WalletService.validate_withdrawal_address("MSvGuhWjF1y2Y5W4kYd5D8t6g3M8B2xZ1q", Cryptocurrency.LTC)
     # Legacy / P2SH (starts with 3)
     assert WalletService.validate_withdrawal_address("3CDJNfdHG8LuJnnTUGCb8VovTGYwZRNnnU", Cryptocurrency.LTC)
     # Native SegWit (Bech32)
     assert WalletService.validate_withdrawal_address("ltc1qg4df8e4yv9q7j2w3u4e5r6t7y8u9i0o1p2a3s4", Cryptocurrency.LTC)
-    # Invalid addresses
+    assert WalletService.validate_withdrawal_address("ltc1q8dg9mm2rmv96jlvncc6sdrpqd9p8nc2sagm4wr", Cryptocurrency.LTC)
+    # Invalid addresses (the second one only differs from a valid LTC address
+    # by a trailing '0' instead of '6' — base58 forbids '0')
     assert WalletService.validate_withdrawal_address("invalid_ltc_address", Cryptocurrency.LTC) is False
+    assert WalletService.validate_withdrawal_address("Lbu2oY3vxS5CdH87MW6PsWmpuDXb1zsn10", Cryptocurrency.LTC) is False
     assert WalletService.validate_withdrawal_address("0x3be94a238ec30f2848e5a3e18251b14980c77f7f", Cryptocurrency.LTC) is False
 
 

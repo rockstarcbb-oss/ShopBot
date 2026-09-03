@@ -7,11 +7,14 @@ from enums.runtime_environment import RuntimeEnvironment
 from utils.utils import get_sslipio_external_url, start_ngrok, hash_password
 
 load_dotenv(".env.bot.dev")
-RUNTIME_ENVIRONMENT = "production"
-if RUNTIME_ENVIRONMENT == RuntimeEnvironment.DEV:
-    WEBHOOK_HOST = start_ngrok()
-else:
-    WEBHOOK_HOST = get_sslipio_external_url()
+RUNTIME_ENVIRONMENT = os.environ.get("RUNTIME_ENVIRONMENT", "production")
+# On hosting platforms like Railway the auto-generated sslip.io URL is not
+# reachable by payment providers (their callbacks cannot resolve it), which
+# leaves crypto deposits stuck in Pending. Set WEBHOOK_HOST (or WEBHOOK_URL)
+# to the public domain of the deployment to override the auto-detected URL.
+WEBHOOK_HOST = ((os.environ.get("WEBHOOK_HOST") or os.environ.get("WEBHOOK_URL")) or
+                (start_ngrok() if RUNTIME_ENVIRONMENT == RuntimeEnvironment.DEV else
+                 get_sslipio_external_url())).rstrip("/")
 WEBHOOK_PATH = os.environ.get("WEBHOOK_PATH", "/")
 WEBAPP_HOST = os.environ.get("WEBAPP_HOST", "0.0.0.0")
 WEBAPP_PORT = int(os.environ.get("WEBAPP_PORT", "5000"))
