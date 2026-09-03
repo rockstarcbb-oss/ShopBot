@@ -153,6 +153,8 @@ User registration happens automatically on the first `/start` command.
 
 Open `All categories`, select a category, select a subcategory, choose quantity, and confirm the purchase.
 
+Digital items are delivered immediately after payment. If the seller attached a QR code or other image, the bot sends that photo with the digital code in the caption below it. You can also reopen the same image and code later from `My Profile -> Purchase History`.
+
 ### Purchase history
 
 Open `My Profile -> Purchase History` to see previous purchases and open details for each one.
@@ -220,7 +222,8 @@ Example:
     "subcategory": "Subcategory#2",
     "price": 100,
     "description": "Mocked description",
-    "private_data": "Mocked private data"
+    "private_data": "Mocked private data",
+    "delivery_image": "https://example.com/qr-code.png"
   }
 ]
 ```
@@ -238,8 +241,8 @@ PHYSICAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;null
 PHYSICAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;null
 PHYSICAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;null
 PHYSICAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;null
-DIGITAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#5
-DIGITAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#6
+DIGITAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#5;https://example.com/qr-code.png
+DIGITAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#6;https://example.com/qr-code.png
 DIGITAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#7
 DIGITAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#8
 ```

@@ -57,7 +57,7 @@ class BuyService:
     @staticmethod
     async def get_purchase(callback_data: MyProfileCallback,
                            session: AsyncSession,
-                           language: Language) -> tuple[str | InputMediaDocument, InlineKeyboardBuilder]:
+                           language: Language) -> tuple[str | InputMediaDocument | InputMediaPhoto, InlineKeyboardBuilder]:
         buy = await BuyRepository.get_by_id(callback_data.buy_id, session)
         buyItem_dto = await BuyItemRepository.get_by_id(callback_data.buyItem_id, session)
         items = await ItemRepository.get_by_id_list(buyItem_dto.item_ids, session)
@@ -111,8 +111,15 @@ class BuyService:
             media = InputMediaDocument(media=BufferedInputFile(byte_array, f"Purchase#{buy.id}.txt"),
                                        caption=msg)
             return media, kb_builder
-        else:
-            return msg, kb_builder
+        delivery_image = None
+        for item in items:
+            image, _ = MessageService.resolve_delivery_content(item)
+            if image:
+                delivery_image = image
+                break
+        if delivery_image:
+            return InputMediaPhoto(media=delivery_image, caption=msg), kb_builder
+        return msg, kb_builder
 
     @staticmethod
     async def get_purchased_item(callback_data: MyProfileCallback | None,

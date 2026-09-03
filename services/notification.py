@@ -16,11 +16,13 @@ from enums.cryptocurrency import Cryptocurrency
 from enums.language import Language
 from enums.user_role import UserRole
 from models.buy import RefundDTO, BuyDTO
+from models.item import ItemDTO
 from models.payment import ProcessingPaymentDTO, TablePaymentDTO
 from models.referral import ReferralBonusDTO
 from models.review import ReviewDTO
 from models.user import UserDTO
 from models.withdrawal import WithdrawalDTO
+from services.message import MessageService
 from services.multibot import MultibotService
 from utils.telegram import create_bot
 from repositories.buyItem import BuyItemRepository
@@ -143,26 +145,54 @@ class NotificationService:
     @staticmethod
     async def send_to_user(message: str, telegram_id: int, reply_markup: types.InlineKeyboardMarkup | None = None):
         if config.MULTIBOT:
-            await MultibotsService.send_message_to_user(message, telegram_id, reply_markup=reply_markup)
+            await MultibotService.send_message_to_user(message, telegram_id, reply_markup=reply_markup)
             return
         bot = create_bot(TOKEN)
         try:
-            if "https://" in message and (".png" in message or ".jpg" in message or ".jpeg" in message):
-                words = message.split()
-                photo_url = next((w for w in words if w.startswith("https://")), None)
-                if photo_url:
-                    clean_text = message.replace(photo_url, "").strip()
-                    await bot.send_photo(chat_id=telegram_id, photo=photo_url, caption=clean_text, reply_markup=reply_markup)
-                else:
-                    await bot.send_message(telegram_id, message, reply_markup=reply_markup)
-            else:
-                await bot.send_message(telegram_id, message, reply_markup=reply_markup)
+            await bot.send_message(telegram_id, message, reply_markup=reply_markup)
         except Exception as e:
             logging.error(e)
         finally:
             await bot.session.close()
 
+    @staticmethod
+    async def send_photo_to_user(photo: str,
+                                 caption: str | None,
+                                 telegram_id: int,
+                                 reply_markup: types.InlineKeyboardMarkup | None = None):
+        if config.MULTIBOT:
+            sent = await MultibotService.send_photo_to_user(photo, telegram_id, caption, reply_markup)
+            if sent:
+                return
+            if caption:
+                await MultibotService.send_message_to_user(caption, telegram_id, reply_markup=reply_markup)
+            return
+        bot = create_bot(TOKEN)
+        try:
+            await bot.send_photo(chat_id=telegram_id, photo=photo, caption=caption, reply_markup=reply_markup)
+        except Exception as e:
+            logging.error(e)
+            if caption:
+                try:
+                    await bot.send_message(telegram_id, caption, reply_markup=reply_markup)
+                except Exception as fallback_error:
+                    logging.error(fallback_error)
+        finally:
+            await bot.session.close()
 
+    @staticmethod
+    async def deliver_digital_items(telegram_id: int, items: list[ItemDTO], language: Language):
+        deliveries = MessageService.build_digital_delivery_messages(items, language)
+        for image, caption in deliveries:
+            if image:
+                if len(caption) > MessageService.PHOTO_CAPTION_LIMIT:
+                    short_caption = get_text(language, BotEntity.USER, "digital_item_photo_caption")
+                    await NotificationService.send_photo_to_user(image, short_caption, telegram_id)
+                    await NotificationService.send_to_user(caption, telegram_id)
+                else:
+                    await NotificationService.send_photo_to_user(image, caption, telegram_id)
+            else:
+                await NotificationService.send_to_user(caption, telegram_id)
 
     @staticmethod
     async def edit_message(message: str, source_message_id: int, chat_id: int):

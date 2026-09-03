@@ -87,12 +87,20 @@ async def add_items_document(message: Message, state: FSMContext, session: Async
     await state.clear()
 
 
+@inventory_management.message(AdminIdFilter(), F.photo, StateFilter(InventoryManagementStates.delivery_image))
+async def add_items_delivery_photo(message: Message, state: FSMContext, session: AsyncSession, language: Language):
+    msg, kb_builder = await InventoryManagementService.add_item_menu(message, state, session, language)
+    sent_message = await message.answer(text=msg, reply_markup=kb_builder.as_markup())
+    await state.update_data(msg_id=sent_message.message_id, chat_id=sent_message.chat.id)
+
+
 @inventory_management.message(AdminIdFilter(), F.text, StateFilter(InventoryManagementStates.item_type,
                                                                    InventoryManagementStates.category,
                                                                    InventoryManagementStates.subcategory,
                                                                    InventoryManagementStates.price,
                                                                    InventoryManagementStates.description,
-                                                                   InventoryManagementStates.private_data))
+                                                                   InventoryManagementStates.private_data,
+                                                                   InventoryManagementStates.delivery_image))
 async def add_items_menu(message: Message, state: FSMContext, session: AsyncSession, language: Language):
     msg, kb_builder = await InventoryManagementService.add_item_menu(message, state, session, language)
     message = await message.answer(text=msg, reply_markup=kb_builder.as_markup())
