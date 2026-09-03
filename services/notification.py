@@ -140,28 +140,28 @@ class NotificationService:
                 logging.error(e)
         await bot.session.close()
 
-     @staticmethod
-     async def send_to_user(message: str, telegram_id: int, reply_markup: types.InlineKeyboardMarkup | None = None):
-         if config.MULTIBOT:
-             await MultibotsService.send_message_to_user(message, telegram_id, reply_markup=reply_markup)
-             return
-         bot = create_bot(TOKEN)
-         try:
-             # Tikriname, ar tekste yra tiesioginė nuoroda į nuotrauką
-             if "https://" in message and (".png" in message or ".jpg" in message or ".jpeg" in message):
-                 words = message.split()
-                 photo_url = next((w for w in words if w.startswith("https://")), None)
-                 if photo_url:
-                     clean_text = message.replace(photo_url, "").strip()
-                     await bot.send_photo(chat_id=telegram_id, photo=photo_url, caption=clean_text, reply_markup=reply_markup)
-                 else:
-                     await bot.send_message(telegram_id, message, reply_markup=reply_markup)
-             else:
-                 await bot.send_message(telegram_id, message, reply_markup=reply_markup)
-         except Exception as e:
-             logging.error(e)
-         finally:
-             await bot.session.close()
+    @staticmethod
+    async def send_to_user(message: str, telegram_id: int, reply_markup: types.InlineKeyboardMarkup | None = None):
+        if config.MULTIBOT:
+            await MultibotsService.send_message_to_user(message, telegram_id, reply_markup=reply_markup)
+            return
+        bot = create_bot(TOKEN)
+        try:
+            if "https://" in message and (".png" in message or ".jpg" in message or ".jpeg" in message):
+                words = message.split()
+                photo_url = next((w for w in words if w.startswith("https://")), None)
+                if photo_url:
+                    clean_text = message.replace(photo_url, "").strip()
+                    await bot.send_photo(chat_id=telegram_id, photo=photo_url, caption=clean_text, reply_markup=reply_markup)
+                else:
+                    await bot.send_message(telegram_id, message, reply_markup=reply_markup)
+            else:
+                await bot.send_message(telegram_id, message, reply_markup=reply_markup)
+        except Exception as e:
+            logging.error(e)
+        finally:
+            await bot.session.close()
+
 
 
     @staticmethod
