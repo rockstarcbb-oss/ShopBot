@@ -249,7 +249,7 @@ class CartService:
                 cart_total_price = cart_total_price - coupon_dto.value
                 cart_total_price = max(cart_total_price, 1)
             discount_amount = cart_total_price_before_discount - cart_total_price
-            cart_content.append(f"\n{get_text(language, BotEntity.USER, "cart_total_price").format(
+            cart_content.append(f"\n{get_text(language, BotEntity.USER, 'cart_total_price').format(
                 cart_total_price=cart_total_price_before_discount,
                 currency_sym=sym
             )}")
@@ -262,7 +262,7 @@ class CartService:
                 currency_sym=sym
             ))
         else:
-            cart_content.append(f"\n{get_text(language, BotEntity.USER, "cart_total_price").format(
+            cart_content.append(f"\n{get_text(language, BotEntity.USER, 'cart_total_price').format(
                 cart_total_price=cart_total_price,
                 currency_sym=sym
             )}")

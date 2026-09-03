@@ -18,6 +18,11 @@ from utils.localizator import Localizator
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
+# Used as a fallback everywhere a media file id is expected but the bot photo
+# is not available (e.g. fresh install where startup has not cached it yet).
+NO_IMAGE_URL = ("https://img.freepik.com/premium-vector/no-photo-available-vector-icon-default-image-symbol-"
+                "picture-coming-soon-web-site-mobile-app_87543-18055.jpg")
+
 
 def get_sslipio_external_url():
     external_ip = urllib.request.urlopen('https://api.ipify.org').read().decode('utf8')
@@ -27,8 +32,21 @@ def get_sslipio_external_url():
 
 
 def get_bot_photo_id() -> str:
-    with open("static/no_image.jpeg", "r") as f:
-        return f.read()
+    """
+    Returns the cached telegram file id of the bot's "no image" photo.
+
+    The cache file is written during startup (see MediaService.ensure_bot_photo).
+    If it is missing (fresh clone, multibot mode, wiped working directory) a
+    publicly available fallback image URL is returned instead of raising, so
+    that flows like item/category creation keep working.
+    """
+    try:
+        with open("static/no_image.jpeg", "r") as f:
+            return f.read()
+    except OSError:
+        logging.warning("static/no_image.jpeg is missing or unreadable; "
+                        "using the fallback image URL until the bot restarts")
+        return NO_IMAGE_URL
 
 
 def start_ngrok():

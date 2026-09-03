@@ -393,6 +393,7 @@ async def test_announcement_service_marks_restocking_not_new_once(monkeypatch):
 async def test_multibot_startup_restores_child_webhooks(monkeypatch):
     restored = []
     created = []
+    bot_photo_ensured = []
 
     async def _fake_create_db_and_tables():
         created.append(True)
@@ -400,12 +401,17 @@ async def test_multibot_startup_restores_child_webhooks(monkeypatch):
     async def _fake_restore(url):
         restored.append(url)
 
+    async def _fake_ensure_bot_photo(bot):
+        bot_photo_ensured.append(bot)
+
     bot = _FakeBot("main-token")
 
     monkeypatch.setattr("multibot.create_db_and_tables", _fake_create_db_and_tables)
     monkeypatch.setattr("multibot.MultibotService.restore_child_bot_webhooks", _fake_restore)
+    monkeypatch.setattr("multibot.MediaService.ensure_bot_photo", _fake_ensure_bot_photo)
 
     await on_startup(SimpleNamespace(), bot)
 
     assert created == [True]
+    assert bot_photo_ensured == [bot]
     assert restored == ["https://example.com/webhook/bot/{bot_token}"]

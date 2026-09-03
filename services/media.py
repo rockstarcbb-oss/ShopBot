@@ -1,9 +1,14 @@
+from pathlib import Path
+import logging
+
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, InputMediaPhoto, InputMediaVideo, InputMediaAnimation
+from aiogram.types import Message, InputMediaPhoto, InputMediaVideo, InputMediaAnimation, URLInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
+
+import config
 
 from callbacks import MediaManagementCallback, AdminMenuCallback
 from db import session_commit, get_db_session
@@ -17,7 +22,7 @@ from repositories.button_media import ButtonMediaRepository
 from repositories.category import CategoryRepository
 from repositories.subcategory import SubcategoryRepository
 from services.notification import NotificationService
-from utils.utils import get_text, get_bot_photo_id
+from utils.utils import get_text, get_bot_photo_id, NO_IMAGE_URL
 
 
 class MediaService:
@@ -140,6 +145,41 @@ class MediaService:
             entity=entity_type.get_localized(language),
             entity_name=entity_dto.name
         ), kb_builder
+
+    @staticmethod
+    async def ensure_bot_photo(bot: Bot):
+        """
+        Caches the bot's "no image" photo file id into static/no_image.jpeg.
+
+        Must run at startup before any media is created: new categories,
+        subcategories, button media, etc. use this id as the default image.
+        Creates the static directory and the cache file if they are missing.
+        """
+        static = Path("static")
+        if static.exists() is False:
+            static.mkdir()
+        me = await bot.get_me()
+        photos = await bot.get_user_profile_photos(me.id)
+        if photos.total_count == 0:
+            photo_id_list = []
+            for admin_id in config.ADMIN_ID_LIST:
+                try:
+                    msg = await bot.send_photo(chat_id=admin_id,
+                                               photo=URLInputFile(url=NO_IMAGE_URL,
+                                                                  filename="no_image.png"))
+                    bot_photo_id = msg.photo[-1].file_id
+                    photo_id_list.append(bot_photo_id)
+                except Exception as _:
+                    pass
+            if not photo_id_list:
+                logging.warning("Could not upload the fallback image to any admin; "
+                                "the fallback URL will be used as media")
+                return
+            bot_photo_id = photo_id_list[0]
+        else:
+            bot_photo_id = photos.photos[0][-1].file_id
+        with open("static/no_image.jpeg", "w") as f:
+            f.write(bot_photo_id)
 
     @staticmethod
     def convert_to_media(media_id: str, caption: str) -> InputMediaPhoto | InputMediaVideo | InputMediaAnimation:

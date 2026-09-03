@@ -1,3 +1,5 @@
+import logging
+
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -202,7 +204,12 @@ class InventoryManagementService:
                 await state.clear()
                 msg = get_text(language, BotEntity.ADMIN, "add_items_success").format(adding_result=len(items_list))
                 cancel_button.text = get_text(language, BotEntity.COMMON, "back_button")
-            except Exception as _:
+            except Exception:
+                state_data = await state.get_data()
+                logging.exception("Failed to add item(s) at the price step "
+                                  "(category: %r, subcategory: %r)",
+                                  state_data.get('category_name'),
+                                  state_data.get('subcategory_name'))
                 msg = InventoryManagementService._price_prompt(language)
         kb_builder.row(cancel_button)
         return msg, kb_builder

@@ -13,7 +13,7 @@ class SortProperty(IntEnum):
     TOTAL_PRICE = 5
 
     def get_localized(self, language: Language):
-        return f"{get_text(language, BotEntity.COMMON, "sort")}{get_text(language, BotEntity.COMMON, self.name.lower())}"
+        return f"{get_text(language, BotEntity.COMMON, 'sort')}{get_text(language, BotEntity.COMMON, self.name.lower())}"
 
     def get_column(self, table):
         return getattr(table, self.name.lower())
