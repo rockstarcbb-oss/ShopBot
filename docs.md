@@ -249,6 +249,25 @@ DIGITAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#8
 
 ![Add Items TXT](https://i.imgur.com/jct3qGc.gif)
 
+#### Add Items via MENU
+
+Open `🔑 Admin Menu -> 📦 Inventory Management -> ➕ Add Items -> MENU` and follow the prompts:
+item type, category, subcategory, description, data, delivery image(s) and price.
+
+> **Note**  
+> For digital items every line of the data you send becomes a separate item
+> (1 line = 1 item, 10 lines = 10 items).
+
+After the data step the bot asks for a delivery image **for each line**, one by one
+(`📷 Delivery photo 1 of 3`, `2 of 3`, ...). For every line you can:
+
+- send a photo (photos sent as an album are assigned in order),
+- send an image URL (`https://...`),
+- send `skip` so that this line has no image.
+
+Each buyer receives the photo that belongs to the code they purchased: if the codes
+have different photos, the buyer gets a separate photo for each code.
+
 #### Delete category or subcategory
 
 > **Note**  
