@@ -25,14 +25,14 @@
 [![Tether](https://img.shields.io/badge/Tether-168363?&logo=tether&logoColor=white)](https://tether.to/)
 [![USD Coin](https://img.shields.io/badge/USD%20Coin-2775CA?&logo=usd-coin&logoColor=white)](https://www.usdc.com/)
 
-**AiogramShopBot** is an open source Telegram shop bot built with **Aiogram 3**, **FastAPI**, **SQLAlchemy async**, **PostgreSQL**, **Redis**, **Docker Compose**, and **SQLAdmin**. It helps you sell **digital goods** and **physical goods** inside Telegram with built-in **cryptocurrency payments**, **shopping cart**, **purchase history**, **admin tools**, **shipping**, **reviews**, **coupons**, **analytics**, **referrals**, and **multi-language support**.
+**AiogramShopBot** is an open source Telegram shop bot built with **Aiogram 3**, **FastAPI**, **SQLAlchemy async**, **PostgreSQL**, **Redis**, **Docker Compose**, and **SQLAdmin**. It helps you sell goods inside Telegram with built-in **cryptocurrency payments**, **shopping cart**, **purchase history**, **admin tools**, **reviews**, **coupons**, **analytics**, **referrals**, and **multi-language support**. Every item is delivered the same way: right after checkout the buyer receives its data together with the delivery photo.
 
 This repository is designed for developers and product teams who need a production-style Telegram ecommerce bot with a web admin panel, payment processing, localization, and scalable deployment.
 
 ## ✨ Why This Project
 
-- Sell digital and physical products directly in Telegram.
-- Accept crypto top-ups with Bitcoin, Dogecoin, Litecoin, Solana, Ethereum, Binance Coin, USDT, and USDC networks.
+- Sell products from two city catalogues (`💾 Panevėžys` and `🏷️ Kaunas`) directly in Telegram.
+- Accept crypto top-ups with Bitcoin, Litecoin and Solana; the other supported networks (Dogecoin, Ethereum, Binance Coin, USDT and USDC) stay wired up with their buttons hidden.
 - Manage inventory, users, coupons, shipping, reviews, media, and purchases from Telegram admin flows.
 - Use PostgreSQL, Redis, webhook mode, and Docker-based deployment for production setups.
 - Extend the project with FastAPI routes, SQLAdmin, repositories, services, and Aiogram handlers.
@@ -40,6 +40,7 @@ This repository is designed for developers and product teams who need a producti
 ## 🚀 Core Features
 
 - Telegram storefront with categories, subcategories, cart, checkout, and purchase history.
+- Instant delivery for every item: data plus a delivery photo per purchased item, for both city catalogues.
 - Admin menu for announcements, inventory, user management, analytics, wallet operations, media, coupons, shipping, buys, and reviews.
 - Crypto payment integration with KryptoExpress.
 - Referral system with limits and anti-abuse rules.
@@ -126,7 +127,7 @@ More Telegram bot GIF demos, admin flow examples, and screenshots are available 
 ## 🎯 Use Cases
 
 - Telegram shop bot for digital products
-- Telegram bot for physical goods with shipping
+- Telegram bot with city-based catalogues and instant delivery
 - Crypto-funded Telegram marketplace
 - Telegram multibot commerce setup with one manager bot
 - Aiogram ecommerce starter project

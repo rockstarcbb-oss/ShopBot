@@ -145,15 +145,22 @@ User registration happens automatically on the first `/start` command.
 
 - Open `👤 My profile`
 - Open `➕ Top Up Balance`
-- Select a cryptocurrency
+- Select a cryptocurrency (`₿ BTC`, `Ł LTC` or `SOL`)
 - Copy the payment address
 - Send crypto and wait for confirmation
 
+> **Note**  
+> Only BTC, LTC and SOL have a button in this menu. The other networks the bot supports
+> (DOGE, ETH, BNB, USDT/USDC on Solana, ERC-20 and BEP-20) are hidden, not removed:
+> payments already created for them, their provider callbacks, deposit statistics and
+> admin withdrawals all keep working. Edit `ACCEPTED_PAYMENT_COINS` in
+> `enums/cryptocurrency.py` to change which buttons buyers see.
+
 ### Purchase of goods
 
-Open `All categories`, select a category, select a subcategory, choose quantity, and confirm the purchase.
+Open `All categories`, pick a city (`💾 Panevezys` or `🏷️ Kaunas`), select a category, select a subcategory, choose the quantity, add it to the cart and confirm the purchase.
 
-Digital items are delivered immediately after payment. If the seller attached a QR code or other image, the bot sends that photo with the digital code in the caption below it. You can also reopen the same image and code later from `My Profile -> Purchase History`.
+Every purchase is delivered immediately after the balance is charged, no matter which city the item comes from: the bot sends the item data and, when the seller attached one, the delivery photo (QR code, game card, pickup code, parcel photo, ...) with the data in the caption below it. There is no shipping address and no shipping option step - a Kaunas item is bought exactly like a Panevezys one. You can reopen the same data and photo later from `My Profile -> Purchase History`.
 
 ### Purchase history
 
@@ -197,6 +204,14 @@ Generated from items where `is_sold = false`.
 
 ### Inventory Management
 
+Items from both cities are added the same way: every item carries the data the buyer
+receives (`private_data`) and, optionally, a delivery photo (`delivery_image`).
+
+> **Note**  
+> Kaunas stock that was added before this change has no data and no photo attached, so
+> buying it would deliver an empty message. Re-add that stock with its data (or fill in
+> `private_data` / `delivery_image` in the SQLAdmin panel) before selling it.
+
 #### Add Items via JSON
 
 Send a `.json` file after opening `🔑 Admin Menu -> 📦 Inventory Management -> ➕ Add Items -> JSON`.
@@ -214,7 +229,8 @@ Example:
     "subcategory": "Subcategory#1",
     "price": 50,
     "description": "Mocked description",
-    "private_data": null
+    "private_data": "Mocked private data",
+    "delivery_image": "https://example.com/image.png"
   },
   {
     "item_type": "Digital",
@@ -237,26 +253,34 @@ Open `🔑 Admin Menu -> 📦 Inventory Management -> ➕ Add Items -> TXT` and 
 Example:
 
 ```txt
-PHYSICAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;null
-PHYSICAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;null
-PHYSICAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;null
-PHYSICAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;null
+PHYSICAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#1;https://example.com/image1.png
+PHYSICAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#2;https://example.com/image2.png
+PHYSICAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#3
+PHYSICAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#4
 DIGITAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#5;https://example.com/qr-code.png
 DIGITAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#6;https://example.com/qr-code.png
 DIGITAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#7
 DIGITAL;CATEGORY#1;SUBCATEGORY#1;DESCRIPTION#1;50.0;PRIVATE_DATA#8
 ```
 
+Both cities use the same columns: `ITEM_TYPE;CATEGORY;SUBCATEGORY;DESCRIPTION;PRICE;PRIVATE_DATA[;DELIVERY_IMAGE]`.
+`null` (or `-`) in the data column means the item has no data attached, and the delivery
+image column is optional. `ITEM_TYPE` accepts `DIGITAL` / `PHYSICAL` or the city name
+(`Panevėžys` / `Kaunas`), the same as in the JSON `item_type` field.
+
 ![Add Items TXT](https://i.imgur.com/jct3qGc.gif)
 
 #### Add Items via MENU
 
 Open `🔑 Admin Menu -> 📦 Inventory Management -> ➕ Add Items -> MENU` and follow the prompts:
-item type, category, subcategory, description, data, delivery image(s) and price.
+item type (city), category, subcategory, description, data, delivery image(s) and price.
+
+The item type step accepts `DIGITAL` / `PHYSICAL` as well as the city names shown in the
+bot (`Panevėžys`, `Kaunas`, in any of the bot languages); anything else is re-asked.
 
 > **Note**  
-> For digital items every line of the data you send becomes a separate item
-> (1 line = 1 item, 10 lines = 10 items).
+> Every line of the data you send becomes a separate item
+> (1 line = 1 item, 10 lines = 10 items) - for Panevezys and Kaunas items alike.
 
 After the data step the bot asks for a delivery image **for each line**, one by one
 (`📷 Delivery photo 1 of 3`, `2 of 3`, ...). For every line you can:
@@ -265,8 +289,8 @@ After the data step the bot asks for a delivery image **for each line**, one by 
 - send an image URL (`https://...`),
 - send `skip` so that this line has no image.
 
-Each buyer receives the photo that belongs to the code they purchased: if the codes
-have different photos, the buyer gets a separate photo for each code.
+Each buyer receives the photo that belongs to the item they purchased: if the items
+have different photos, the buyer gets a separate photo for each one.
 
 #### Delete category or subcategory
 
@@ -341,6 +365,12 @@ Select an existing coupon and choose whether to enable or disable it.
 
 ### Shipping management
 
+> **Note**  
+> Shipping is no longer part of the checkout: every city is delivered instantly, so new
+> orders never ask for a shipping address or a shipping option. These screens are kept
+> for orders that were placed before that change (their address, shipping option and
+> track number are still shown in `Buys management` and in the buyer's purchase history).
+
 #### Create new shipping option
 
 Open `🔑 Admin Menu -> 📦 Shipping management -> 🚚 Create new shipping option`.
@@ -355,7 +385,7 @@ Open `🔑 Admin Menu -> 📦 Shipping management -> 📋 View all shipping opti
 
 ### Buys management
 
-Used mainly to view user purchases and update tracking numbers for physical orders.
+Used mainly to view user purchases and update tracking numbers for legacy shipped orders.
 
 ![Buys Management](https://i.imgur.com/4aPUnHx.gif)
 
@@ -473,7 +503,8 @@ User-facing demos are shown in the main [README](readme.md). Additional admin de
 - [x] Improved shopping cart with `+1` and `-1` marketplace-like controls.
 - [x] Improved user management with blocking.
 - [x] Review functionality.
-- [x] Support for physical goods with shipping.
+- [x] Instant delivery (data + photo) for items from both cities.
+- [x] Shipping address, shipping options and track numbers kept for legacy orders.
 - [x] Multiple localization with i18n.
 - [x] Referral system.
 - [x] SQLAdmin web interface.

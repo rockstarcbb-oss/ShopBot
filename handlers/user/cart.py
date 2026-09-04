@@ -75,26 +75,7 @@ async def set_coupon(**kwargs):
     await state.update_data(msg_id=message.message_id, chat_id=message.chat.id)
 
 
-async def set_shipping_address(**kwargs):
-    callback: CallbackQuery = kwargs.get("callback")
-    state: FSMContext = kwargs.get("state")
-    language: Language = kwargs.get("language")
-    msg, kb_builder = await CartService.set_shipping_address(state, language)
-    message = await callback.message.edit_caption(caption=msg, reply_markup=kb_builder.as_markup())
-    await state.update_data(msg_id=message.message_id, chat_id=message.chat.id)
-
-
-async def pick_shipping_option(**kwargs):
-    callback: CallbackQuery = kwargs.get("callback")
-    callback_data: CartCallback = kwargs.get("callback_data")
-    language: Language = kwargs.get("language")
-    session: AsyncSession = kwargs.get("session")
-    msg, kb_builder = await CartService.get_shipping_options_paginated(callback_data.page, session, language)
-    await callback.message.edit_caption(caption=msg, reply_markup=kb_builder.as_markup())
-
-
-@cart_router.message(F.text, IsUserExistFilter(), StateFilter(UserStates.coupon,
-                                                              UserStates.shipping_address))
+@cart_router.message(F.text, IsUserExistFilter(), StateFilter(UserStates.coupon))
 async def receive_purchase_details(message: Message, state: FSMContext, session: AsyncSession, language: Language):
     media, kb_builder = await CartService.receive_purchase_details(message, state, session, language)
     if hasattr(media, "caption") and media.caption and "https://" in media.caption and (".png" in media.caption or ".jpg" in media.caption or ".jpeg" in media.caption):
@@ -118,13 +99,16 @@ async def navigate_cart_process(callback: CallbackQuery,
                                 language: Language):
     current_level = callback_data.level
 
+    # Levels 4 and 5 used to collect the shipping address and the shipping option.
+    # Every city is delivered instantly now, so those (possibly stale) buttons just
+    # return the buyer to the checkout confirmation.
     levels = {
         0: show_cart,
         1: show_cart_item,
         2: checkout_processing,
         3: set_coupon,
-        4: set_shipping_address,
-        5: pick_shipping_option,
+        4: checkout_processing,
+        5: checkout_processing,
         6: buy_processing
     }
 

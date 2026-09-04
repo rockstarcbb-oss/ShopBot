@@ -30,9 +30,9 @@ class WalletService:
         kb_builder = InlineKeyboardBuilder()
         wallet_balance = await CryptoApiWrapper.get_wallet_balance()
         wallet_content = []
+        # The admin wallet is not filtered by the hidden payment buttons: the funds
+        # of every coin must stay withdrawable.
         for cryptocurrency, amount in wallet_balance.items():
-            if cryptocurrency in Cryptocurrency.get_hidden():
-                continue
             wallet_content.append(get_text(language, BotEntity.ADMIN, "crypto_wallet_line").format(
                 crypto_name=cryptocurrency.name.replace('_', " "),
                 crypto_balance=amount
@@ -47,8 +47,7 @@ class WalletService:
         msg_text = get_text(language, BotEntity.ADMIN, "crypto_wallet").format(
             wallet_content="\n".join(wallet_content)
         )
-        if any(amount > 0 for cryptocurrency, amount in wallet_balance.items()
-               if cryptocurrency not in Cryptocurrency.get_hidden()):
+        if any(amount > 0 for amount in wallet_balance.values()):
             msg_text += get_text(language, BotEntity.ADMIN, "choose_crypto_to_withdraw")
         return msg_text, kb_builder
 

@@ -308,3 +308,99 @@ async def test_delivery_image_single_shared_image_applied_to_every_line(monkeypa
     assert added_items[0].delivery_image == "shared-image"
     assert added_items[1].delivery_image == "shared-image"
     assert await state.get_state() is None
+
+
+async def _build_description_state(state: FSMContext, item_type: str):
+    await state.set_state(InventoryManagementStates.description)
+    await state.set_data({
+        "add_type": "menu",
+        "item_type": item_type,
+        "category_name": "Merch",
+        "subcategory_name": "Shirt",
+        "chat_id": 1,
+        "msg_id": 1,
+    })
+
+
+@pytest.mark.asyncio
+async def test_kaunas_items_ask_for_data_instead_of_quantity():
+    """Kaunas (PHYSICAL) items are added exactly like Panevezys ones: data first."""
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage, key=StorageKey(chat_id=1, user_id=1, bot_id=1))
+    await _build_description_state(state, "PHYSICAL")
+
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        _FakeMessage("T-shirt, black, M"), state, session=None, language=Language.EN)
+
+    assert await state.get_state() == InventoryManagementStates.private_data
+    assert "data that the user will receive" in msg
+    assert "quantity of items you want to sell" not in msg
+
+
+@pytest.mark.asyncio
+async def test_kaunas_items_get_data_and_photo_per_line(monkeypatch):
+    """A Kaunas item carries the buyer data and its own delivery photo."""
+    added_items = []
+    _fake_add_item_dependencies(monkeypatch, added_items)
+
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage, key=StorageKey(chat_id=1, user_id=1, bot_id=1))
+    await _build_private_data_state(state, "PHYSICAL")
+
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        _FakeMessage("PICKUP-CODE-1\nPICKUP-CODE-2"), state, session=None, language=Language.EN)
+    assert await state.get_state() == InventoryManagementStates.delivery_image
+    assert "1 of 2" in msg and "PICKUP-CODE-1" in msg
+
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        _FakeMessage(None, photo=[SimpleNamespace(file_id="kaunas-photo-1")]),
+        state, session=None, language=Language.EN)
+    assert "2 of 2" in msg
+
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        _FakeMessage("skip"), state, session=None, language=Language.EN)
+    assert await state.get_state() == InventoryManagementStates.price
+
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        _FakeMessage("20.0"), state, session=None, language=Language.EN)
+
+    assert len(added_items) == 2
+    assert all(item.item_type.value == "PHYSICAL" for item in added_items)
+    assert [item.private_data for item in added_items] == ["PICKUP-CODE-1", "PICKUP-CODE-2"]
+    assert [item.delivery_image for item in added_items] == ["kaunas-photo-1", None]
+    assert all(item.price == 20.0 for item in added_items)
+    assert await state.get_state() is None
+
+
+async def _build_item_type_state(state: FSMContext):
+    await state.set_state(InventoryManagementStates.item_type)
+    await state.set_data({"add_type": "menu", "chat_id": 1, "msg_id": 1})
+
+
+@pytest.mark.asyncio
+async def test_item_type_step_accepts_city_name():
+    """The admin can answer with the city shown in the bot instead of PHYSICAL."""
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage, key=StorageKey(chat_id=1, user_id=1, bot_id=1))
+    await _build_item_type_state(state)
+
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        _FakeMessage("Kaunas"), state, session=None, language=Language.EN)
+
+    assert await state.get_state() == InventoryManagementStates.category
+    assert (await state.get_data())["item_type"] == "PHYSICAL"
+    assert "category name" in msg
+
+
+@pytest.mark.asyncio
+async def test_item_type_step_reprompts_on_unknown_value():
+    storage = MemoryStorage()
+    state = FSMContext(storage=storage, key=StorageKey(chat_id=1, user_id=1, bot_id=1))
+    await _build_item_type_state(state)
+
+    msg, _kb = await InventoryManagementService.add_item_menu(
+        _FakeMessage("Vilnius"), state, session=None, language=Language.EN)
+
+    assert await state.get_state() == InventoryManagementStates.item_type
+    assert "Please send item type" in msg
+    assert "Kaunas" in msg
