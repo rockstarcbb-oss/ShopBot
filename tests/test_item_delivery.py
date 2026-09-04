@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from callbacks import ReviewManagementCallback
 from enums.item_type import ItemType
 from enums.language import Language
 from models.item import ItemDTO
@@ -311,3 +312,58 @@ async def test_deliver_purchased_items_falls_back_to_text_for_long_captions(monk
     assert sent[0][2] == "📦 Your item"
     assert sent[1][0] == "text"
     assert long_data in sent[1][1]
+
+
+@pytest.mark.asyncio
+async def test_deliver_purchased_items_attaches_review_button(monkeypatch):
+    """The delivered data message carries a review button for its buy item."""
+    sent = []
+
+    async def _send_photo(photo, caption, telegram_id, reply_markup=None):
+        sent.append((photo, caption, telegram_id, reply_markup))
+
+    async def _send_text(message, telegram_id, reply_markup=None):
+        sent.append((None, message, telegram_id, reply_markup))
+
+    monkeypatch.setattr(NotificationService, "send_photo_to_user", _send_photo)
+    monkeypatch.setattr(NotificationService, "send_to_user", _send_text)
+
+    item = _item("STEAM-KEY-1", "https://example.com/qr.png")
+    await NotificationService.deliver_purchased_items(
+        telegram_id=42,
+        items=[item],
+        language=Language.EN,
+        buy_item_id_by_item={item.id: 77},
+        buy_id=9,
+    )
+
+    assert len(sent) == 1
+    markup = sent[0][3]
+    assert markup is not None
+    buttons = [button for row in markup.inline_keyboard for button in row]
+    assert len(buttons) == 1
+    assert buttons[0].text == "⭐ Leave a review"
+    callback_data = ReviewManagementCallback.unpack(buttons[0].callback_data)
+    assert (callback_data.level, callback_data.buy_id, callback_data.buyItem_id) == (1, 9, 77)
+
+
+@pytest.mark.asyncio
+async def test_deliver_purchased_items_no_review_buttons_without_map(monkeypatch):
+    sent = []
+
+    async def _send_photo(photo, caption, telegram_id, reply_markup=None):
+        sent.append(reply_markup)
+
+    async def _send_text(message, telegram_id, reply_markup=None):
+        sent.append(reply_markup)
+
+    monkeypatch.setattr(NotificationService, "send_photo_to_user", _send_photo)
+    monkeypatch.setattr(NotificationService, "send_to_user", _send_text)
+
+    await NotificationService.deliver_purchased_items(
+        telegram_id=42,
+        items=[_item("CODE-1", "file-id-1")],
+        language=Language.EN,
+    )
+
+    assert sent == [None]

@@ -318,6 +318,7 @@ class CartService:
                              status=BuyStatus.COMPLETED)
             buy_dto = await BuyRepository.create(buy_dto, session)
             purchased_for_delivery = []
+            buy_item_id_by_item = {}
             for cart_item in cart_items:
                 purchased_items = await ItemRepository.get_purchased_items(cart_item.item_type,
                                                                            cart_item.category_id,
@@ -326,7 +327,12 @@ class CartService:
                 purchased_for_delivery.extend(purchased_items)
                 item_ids = [item.id for item in purchased_items]
                 buy_item_dto = BuyItemDTO(buy_id=buy_dto.id, item_ids=item_ids)
-                await BuyItemRepository.create_single(buy_item_dto, session)
+                buy_item_dto = await BuyItemRepository.create_single(buy_item_dto, session)
+                # Remember which purchased item belongs to which buy item so the
+                # delivered data message can carry a "leave a review" button.
+                if buy_item_dto is not None and buy_item_dto.id is not None:
+                    for item in purchased_items:
+                        buy_item_id_by_item[item.id] = buy_item_dto.id
                 for item in purchased_items:
                     item.is_sold = True
                 await ItemRepository.update(purchased_items, session)
@@ -345,7 +351,12 @@ class CartService:
             await session_commit(session)
             await NotificationService.new_buy(buy_dto, user, session)
             # Items from every city are delivered the same way: data + delivery photo.
-            await NotificationService.deliver_purchased_items(user.telegram_id, purchased_for_delivery, language)
+            # The delivery messages also carry a review button for each purchased lot.
+            await NotificationService.deliver_purchased_items(user.telegram_id,
+                                                              purchased_for_delivery,
+                                                              language,
+                                                              buy_item_id_by_item=buy_item_id_by_item,
+                                                              buy_id=buy_dto.id)
             return msg, kb_builder
         elif callback_data.confirmation is False:
             kb_builder.row(callback_data.get_back_button(language, 0))

@@ -90,7 +90,15 @@ def _patch_cart_dependencies(monkeypatch, cart_items, availability_map, purchase
         created_buys.append(buy_dto)
         return buy_dto
 
+    async def _create_buy_item(buy_item_dto, session):
+        buy_item_seq["next_id"] += 1
+        buy_item_dto.id = buy_item_seq["next_id"]
+        created_buy_items.append(buy_item_dto)
+        return buy_item_dto
+
     created_buys = []
+    created_buy_items = []
+    buy_item_seq = {"next_id": 499}
     monkeypatch.setattr("services.cart.UserRepository.get_by_tgid", _get_by_tgid)
     monkeypatch.setattr("services.cart.UserRepository.update", _noop)
     monkeypatch.setattr("services.cart.CartItemRepository.get_all_by_user_id", _get_all_by_user_id)
@@ -100,7 +108,7 @@ def _patch_cart_dependencies(monkeypatch, cart_items, availability_map, purchase
     monkeypatch.setattr("services.cart.ItemRepository.update", _noop)
     monkeypatch.setattr("services.cart.SubcategoryRepository.get_by_ids", _get_subcategories_by_ids)
     monkeypatch.setattr("services.cart.BuyRepository.create", _create_buy)
-    monkeypatch.setattr("services.cart.BuyItemRepository.create_single", _noop)
+    monkeypatch.setattr("services.cart.BuyItemRepository.create_single", _create_buy_item)
     monkeypatch.setattr("services.cart.NotificationService.new_buy", _noop)
     return created_buys
 
@@ -160,8 +168,8 @@ async def test_buy_processing_kaunas_item_is_completed_and_delivered(monkeypatch
     )
     delivered = []
 
-    async def _deliver(telegram_id, items, language):
-        delivered.append((telegram_id, items, language))
+    async def _deliver(telegram_id, items, language, **kwargs):
+        delivered.append((telegram_id, items, language, kwargs))
 
     monkeypatch.setattr("services.cart.NotificationService.deliver_purchased_items", _deliver)
 
@@ -181,6 +189,7 @@ async def test_buy_processing_kaunas_item_is_completed_and_delivered(monkeypatch
     assert buy.total_price == 40.0
     assert all(item.is_sold for item in purchased)
     assert delivered[0][0] == 42
+    assert delivered[0][3]["buy_id"] == 7
     assert [item.private_data for item in delivered[0][1]] == ["PICKUP-CODE-1", "PICKUP-CODE-2"]
     assert [item.delivery_image for item in delivered[0][1]] == ["kaunas-photo-1", "kaunas-photo-2"]
 
@@ -200,8 +209,8 @@ async def test_buy_processing_delivers_both_cities_the_same_way(monkeypatch):
     created_buys = _patch_cart_dependencies(monkeypatch, cart_items, availability_map, purchased)
     delivered = []
 
-    async def _deliver(telegram_id, items, language):
-        delivered.append((telegram_id, items, language))
+    async def _deliver(telegram_id, items, language, **kwargs):
+        delivered.append((telegram_id, items, language, kwargs))
 
     monkeypatch.setattr("services.cart.NotificationService.deliver_purchased_items", _deliver)
 
@@ -217,3 +226,40 @@ async def test_buy_processing_delivers_both_cities_the_same_way(monkeypatch):
     assert created_buys[0].total_price == 30.0
     delivered_data = {item.private_data for item in delivered[0][1]}
     assert delivered_data == {"PICKUP-CODE-1", "STEAM-KEY-1"}
+
+
+@pytest.mark.asyncio
+async def test_buy_processing_passes_review_map_to_delivery(monkeypatch):
+    """The delivery gets a per-item buyItem map so review buttons can be attached."""
+    cart_items = [_cart_item(ItemType.PHYSICAL, cart_item_id=11, quantity=1),
+                  _cart_item(ItemType.DIGITAL, cart_item_id=12, quantity=1)]
+    purchased = [
+        _purchased_item(101, ItemType.PHYSICAL, "PICKUP-CODE-1", "kaunas-photo"),
+        _purchased_item(201, ItemType.DIGITAL, "STEAM-KEY-1", "panevezys-photo"),
+    ]
+    availability_map = {
+        (ItemType.PHYSICAL, 1, 2): _availability(ItemType.PHYSICAL),
+        (ItemType.DIGITAL, 1, 2): _availability(ItemType.DIGITAL, price=10.0),
+    }
+    _patch_cart_dependencies(monkeypatch, cart_items, availability_map, purchased)
+    delivered = []
+
+    async def _deliver(telegram_id, items, language, **kwargs):
+        delivered.append((telegram_id, items, language, kwargs))
+
+    monkeypatch.setattr("services.cart.NotificationService.deliver_purchased_items", _deliver)
+
+    await CartService.buy_processing(
+        _callback(),
+        CartCallback.create(level=6, confirmation=True),
+        _make_state(),
+        session=None,
+        language=Language.EN,
+    )
+
+    assert len(delivered) == 1
+    _telegram_id, items, _language, kwargs = delivered[0]
+    assert kwargs["buy_id"] == 7
+    buy_item_map = kwargs["buy_item_id_by_item"]
+    assert buy_item_map == {101: 500, 201: 501}
+    assert [item.id for item in items] == [101, 201]

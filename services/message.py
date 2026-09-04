@@ -57,20 +57,28 @@ class MessageService:
         return MessageService.create_message_with_codes(codes, language)
 
     @staticmethod
-    def build_delivery_messages(items: list[ItemDTO], language: Language) -> list[tuple[str | None, str]]:
-        """Group purchased items by delivery image and build (image, caption) payloads.
+    def build_delivery_groups(items: list[ItemDTO],
+                              language: Language) -> list[tuple[str | None, str, list[ItemDTO]]]:
+        """Group purchased items by delivery image and build (image, caption, items) payloads.
 
         Every item type is delivered the same way: the buyer receives the item data
         and, when the seller attached one, the delivery photo.
         """
-        groups: OrderedDict[str, list[str | None]] = OrderedDict()
+        groups: OrderedDict[str, list[ItemDTO]] = OrderedDict()
         for item in items:
-            image, code = MessageService.resolve_delivery_content(item)
-            groups.setdefault(image or "", []).append(code)
-        deliveries: list[tuple[str | None, str]] = []
+            image, _ = MessageService.resolve_delivery_content(item)
+            groups.setdefault(image or "", []).append(item)
+        deliveries: list[tuple[str | None, str, list[ItemDTO]]] = []
         count = 1
-        for image_key, codes in groups.items():
+        for image_key, group_items in groups.items():
+            codes = [MessageService.resolve_delivery_content(item)[1] for item in group_items]
             caption = MessageService.create_message_with_codes(codes, language, start=count)
-            deliveries.append((image_key or None, caption))
+            deliveries.append((image_key or None, caption, group_items))
             count += len(codes)
         return deliveries
+
+    @staticmethod
+    def build_delivery_messages(items: list[ItemDTO], language: Language) -> list[tuple[str | None, str]]:
+        """Group purchased items by delivery image and build (image, caption) payloads."""
+        return [(image, caption)
+                for image, caption, _ in MessageService.build_delivery_groups(items, language)]
