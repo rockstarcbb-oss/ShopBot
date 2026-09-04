@@ -242,7 +242,9 @@ class ReviewService:
             )
             review_dto = await ReviewRepository.create(review_dto, session)
             await session.commit()
-        await NotificationService.new_review_published(review_dto, session)
+            # Admins are notified only when a review is actually published, so
+            # tapping the review button again does not spam the admin chat.
+            await NotificationService.new_review_published(review_dto, session)
         kb_builder = InlineKeyboardBuilder()
         kb_builder.button(
             text=get_text(language, BotEntity.COMMON, "back_button"),
@@ -326,6 +328,11 @@ class ReviewService:
                 callback_data=callback_data.model_copy(update={"level": callback_data.level + 2,
                                                                "confirmation": False})
             )
+            kb_builder.button(
+                text=get_text(language, BotEntity.ADMIN, "delete_review"),
+                callback_data=callback_data.model_copy(update={"level": callback_data.level + 3,
+                                                               "confirmation": False})
+            )
             buy_dto = await BuyRepository.get_by_id(buyItem_dto.buy_id, session)
             user_dto = await UserRepository.get_user_entity(buy_dto.buyer_id, session)
             await NotificationService.add_user_button(kb_builder, user_dto, get_text(language, BotEntity.COMMON, "user"))
@@ -373,3 +380,44 @@ class ReviewService:
             await session.commit()
             callback_data.level = 6
             return await ReviewService.view_review_single(callback_data, session, language)
+
+    @staticmethod
+    async def delete_review_confirmation(callback_data: ReviewManagementCallback,
+                                         session: AsyncSession,
+                                         language: Language) -> tuple[InputMediaPhoto, InlineKeyboardBuilder]:
+        kb_builder = InlineKeyboardBuilder()
+        kb_builder.button(
+            text=get_text(language, BotEntity.COMMON, "confirm"),
+            callback_data=callback_data.model_copy(update={"confirmation": True})
+        )
+        kb_builder.button(
+            text=get_text(language, BotEntity.COMMON, "cancel"),
+            callback_data=callback_data.model_copy(update={"level": 6, "confirmation": False})
+        )
+        kb_builder.adjust(1)
+        caption = get_text(language, BotEntity.ADMIN, "delete_review_confirmation")
+        review_dto = await ReviewRepository.get_by_id(callback_data.review_id, session)
+        media = review_dto.image_id or get_bot_photo_id()
+        return InputMediaPhoto(media=media, caption=caption), kb_builder
+
+    @staticmethod
+    async def delete_review(callback: CallbackQuery,
+                            callback_data: ReviewManagementCallback,
+                            session: AsyncSession,
+                            language: Language) -> tuple[InputMediaPhoto, InlineKeyboardBuilder]:
+        is_admin = callback.from_user.id in config.ADMIN_ID_LIST
+        if callback_data.user_role == UserRole.ADMIN and is_admin:
+            await ReviewRepository.delete(callback_data.review_id, session)
+            await session.commit()
+            kb_builder = InlineKeyboardBuilder()
+            kb_builder.button(
+                text=get_text(language, BotEntity.ADMIN, "reviews_management"),
+                callback_data=ReviewManagementCallback.create(level=5,
+                                                              user_role=UserRole.ADMIN,
+                                                              page=callback_data.page)
+            )
+            caption = get_text(language, BotEntity.ADMIN, "review_deleted")
+            return InputMediaPhoto(media=get_bot_photo_id(), caption=caption), kb_builder
+        callback_data.level = 6
+        callback_data.confirmation = False
+        return await ReviewService.view_review_single(callback_data, session, language)

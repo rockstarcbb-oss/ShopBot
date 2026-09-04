@@ -76,6 +76,18 @@ async def remove_review_details(**kwargs):
     await callback.message.edit_media(media=media, reply_markup=kb_builder.as_markup())
 
 
+async def delete_review(**kwargs):
+    callback: CallbackQuery = kwargs.get("callback")
+    callback_data: ReviewManagementCallback = kwargs.get("callback_data")
+    session: AsyncSession = kwargs.get("session")
+    language: Language = kwargs.get("language")
+    if callback_data.confirmation:
+        media, kb_builder = await ReviewService.delete_review(callback, callback_data, session, language)
+    else:
+        media, kb_builder = await ReviewService.delete_review_confirmation(callback_data, session, language)
+    await callback.message.edit_media(media=media, reply_markup=kb_builder.as_markup())
+
+
 @review_management_router.message(F.text | F.photo, StateFilter(UserStates.review_text,
                                                                 UserStates.review_image),
                                   IsUserExistFilter())
@@ -104,7 +116,8 @@ async def review_management_navigation(callback: CallbackQuery,
         5: view_reviews_paginated,
         6: view_review_single,
         7: remove_review_details,
-        8: remove_review_details
+        8: remove_review_details,
+        9: delete_review
     }
 
     current_level_function = levels[current_level]

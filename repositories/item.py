@@ -176,9 +176,3 @@ class ItemRepository:
             dto = ItemAvailabilityDTO.model_validate(row, from_attributes=True)
             result[(dto.item_type, dto.category_id, dto.subcategory_id)] = dto
         return result
-
-    @staticmethod
-    async def get_available_item_types(session: AsyncSession) -> list[ItemType]:
-        stmt = select(Item.item_type).where(Item.is_sold == False).distinct()
-        item_types = await session_execute(stmt, session)
-        return [ItemType(item_type) for item_type in item_types.scalars().all()]

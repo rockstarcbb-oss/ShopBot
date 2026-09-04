@@ -43,7 +43,14 @@ class CategoryService:
 
         has_categories = len(categories) > 0
         if not has_categories:
-            caption = get_text(language, BotEntity.USER, "no_categories")
+            # When a whole city (item type) has no in-stock items yet, tell the
+            # buyer so; the "no categories" message is kept for empty search results.
+            if callback_data.item_type is not None and not callback_data.is_filter_enabled and not filters:
+                caption = get_text(language, BotEntity.USER, "no_items_city").format(
+                    item_type=callback_data.item_type.get_localized(language)
+                )
+            else:
+                caption = get_text(language, BotEntity.USER, "no_categories")
         else:
             kb_builder.adjust(2)
             if callback_data.item_type:

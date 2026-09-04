@@ -207,8 +207,10 @@ class ItemService:
                             language: Language) -> tuple[InputMediaPhoto, InlineKeyboardBuilder]:
         callback_data = callback_data or AllCategoriesCallback.create(0)
         kb_builder = InlineKeyboardBuilder()
-        available_item_types = await ItemRepository.get_available_item_types(session)
-        for item_type in available_item_types:
+        # Both city buttons (Panevezys and Kaunas) are always shown, even when the
+        # city has no in-stock items right now. The "empty city" case is handled on
+        # the next screen (see CategoryService.get_buttons).
+        for item_type in ItemType:
             kb_builder.button(
                 text=item_type.get_localized(language),
                 callback_data=callback_data.model_copy(update={"level": callback_data.level + 1,

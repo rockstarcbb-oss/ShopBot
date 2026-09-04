@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from enums.announcement_type import AnnouncementType
+from enums.item_type import ItemType
 from enums.language import Language
 from services.item import ItemService
 
@@ -93,3 +94,19 @@ async def test_create_announcement_message_splits_large_single_category_without_
     assert len(messages) > 1
     assert all("Single Category" in message for message in messages)
     assert all(len(message) < ItemService.ANNOUNCEMENT_MESSAGE_LIMIT for message in messages)
+
+
+@pytest.mark.asyncio
+async def test_get_all_types_always_shows_both_cities(monkeypatch):
+    """Panevezys and Kaunas buttons are always visible, even with no stock."""
+    async def _fake_get_button(button, session):
+        return SimpleNamespace(media_id="0photo-id")
+
+    monkeypatch.setattr("services.item.ButtonMediaRepository.get_by_button", _fake_get_button)
+
+    media, kb_builder = await ItemService.get_all_types(None, session=None, language=Language.EN)
+
+    buttons = [button.text for row in kb_builder.as_markup().inline_keyboard for button in row]
+    assert "💾 Panevezys" in buttons
+    assert "🏷️ Kaunas" in buttons
+    assert len(buttons) == 2

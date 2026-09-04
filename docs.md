@@ -160,7 +160,13 @@ User registration happens automatically on the first `/start` command.
 
 Open `All categories`, pick a city (`💾 Panevezys` or `🏷️ Kaunas`), select a category, select a subcategory, choose the quantity, add it to the cart and confirm the purchase.
 
+Both city buttons (`💾 Panevezys` and `🏷️ Kaunas`) are always visible on the city
+screen, even when a city has no items in stock right now. If you open a city that
+is currently empty, the bot shows an empty-state message instead of hiding the city.
+
 Every purchase is delivered immediately after the balance is charged, no matter which city the item comes from: the bot sends the item data and, when the seller attached one, the delivery photo (QR code, game card, pickup code, parcel photo, ...) with the data in the caption below it. There is no shipping address and no shipping option step - a Kaunas item is bought exactly like a Panevezys one. You can reopen the same data and photo later from `My Profile -> Purchase History`.
+
+Right on the delivered data message there is a `⭐ Leave a review` button, so the buyer can rate and write a review immediately after the purchase without digging through the purchase history. Published reviews appear on the `⭐ Reviews` page for everyone.
 
 ### Purchase history
 
@@ -391,7 +397,9 @@ Used mainly to view user purchases and update tracking numbers for legacy shippe
 
 ### Reviews management
 
-Used to view and moderate customer reviews.
+Used to view and moderate customer reviews. Admins can remove the text or the
+image of a review, or delete the whole review (with confirmation) straight from
+the admin menu.
 
 ![Reviews Management](https://i.imgur.com/umBysXX.gif)
 

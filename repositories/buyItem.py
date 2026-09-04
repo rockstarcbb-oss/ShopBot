@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 import config
-from db import session_execute
+from db import session_execute, session_flush
 from enums.sort_order import SortOrder
 from enums.sort_property import SortProperty
 from models.buyItem import BuyItem, BuyItemDTO
@@ -27,8 +27,11 @@ class BuyItemRepository:
             session.add(BuyItem(**buy_item_dto.model_dump()))
 
     @staticmethod
-    async def create_single(buy_item_dto: BuyItemDTO, session: AsyncSession):
-        session.add(BuyItem(**buy_item_dto.model_dump()))
+    async def create_single(buy_item_dto: BuyItemDTO, session: AsyncSession) -> BuyItemDTO:
+        buy_item = BuyItem(**buy_item_dto.model_dump())
+        session.add(buy_item)
+        await session_flush(session)
+        return BuyItemDTO.model_validate(buy_item, from_attributes=True)
 
     @staticmethod
     async def get_all_by_buy_id(buy_id: int, session: Session | AsyncSession) -> list[BuyItemDTO]:

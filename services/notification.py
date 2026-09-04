@@ -181,22 +181,47 @@ class NotificationService:
             await bot.session.close()
 
     @staticmethod
-    async def deliver_purchased_items(telegram_id: int, items: list[ItemDTO], language: Language):
+    async def deliver_purchased_items(telegram_id: int,
+                                      items: list[ItemDTO],
+                                      language: Language,
+                                      buy_item_id_by_item: dict[int, int] | None = None,
+                                      buy_id: int | None = None):
         """Send every purchased item to the buyer: its data plus the delivery photo.
 
         Items from all cities (Panevezys and Kaunas) are delivered the same way.
+        When buy_item_id_by_item is provided, every delivery message also gets a
+        "leave a review" button so the buyer can review right from the data message.
         """
-        deliveries = MessageService.build_delivery_messages(items, language)
-        for image, caption in deliveries:
+        deliveries = MessageService.build_delivery_groups(items, language)
+        for image, caption, group_items in deliveries:
+            reply_markup = None
+            if buy_item_id_by_item and buy_id is not None:
+                kb_builder = InlineKeyboardBuilder()
+                seen_buy_item_ids = set()
+                for item in group_items:
+                    buy_item_id = buy_item_id_by_item.get(item.id)
+                    if buy_item_id is None or buy_item_id in seen_buy_item_ids:
+                        continue
+                    seen_buy_item_ids.add(buy_item_id)
+                    kb_builder.button(
+                        text=get_text(language, BotEntity.USER, "write_review"),
+                        callback_data=ReviewManagementCallback.create(level=1,
+                                                                      buy_id=buy_id,
+                                                                      buyItem_id=buy_item_id)
+                    )
+                if seen_buy_item_ids:
+                    kb_builder.adjust(1)
+                    reply_markup = kb_builder.as_markup()
             if image:
                 if len(caption) > MessageService.PHOTO_CAPTION_LIMIT:
                     short_caption = get_text(language, BotEntity.USER, "purchased_item_photo_caption")
                     await NotificationService.send_photo_to_user(image, short_caption, telegram_id)
-                    await NotificationService.send_to_user(caption, telegram_id)
+                    await NotificationService.send_to_user(caption, telegram_id, reply_markup=reply_markup)
                 else:
-                    await NotificationService.send_photo_to_user(image, caption, telegram_id)
+                    await NotificationService.send_photo_to_user(image, caption, telegram_id,
+                                                                 reply_markup=reply_markup)
             else:
-                await NotificationService.send_to_user(caption, telegram_id)
+                await NotificationService.send_to_user(caption, telegram_id, reply_markup=reply_markup)
 
     @staticmethod
     async def edit_message(message: str, source_message_id: int, chat_id: int):

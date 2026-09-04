@@ -1,5 +1,6 @@
-from sqlalchemy import select, func, update
+from sqlalchemy import delete, select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 import config
 from db import session_flush, session_execute
@@ -49,4 +50,9 @@ class ReviewRepository:
     @staticmethod
     async def update(review_dto: ReviewDTO, session: AsyncSession):
         stmt = update(Review).where(Review.id == review_dto.id).values(**review_dto.model_dump())
+        await session_execute(stmt, session)
+
+    @staticmethod
+    async def delete(review_id: int, session: AsyncSession | Session):
+        stmt = delete(Review).where(Review.id == review_id)
         await session_execute(stmt, session)
