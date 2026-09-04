@@ -145,9 +145,16 @@ User registration happens automatically on the first `/start` command.
 
 - Open `👤 My profile`
 - Open `➕ Top Up Balance`
-- Select a cryptocurrency
+- Select a cryptocurrency (`₿ BTC`, `Ł LTC` or `SOL`)
 - Copy the payment address
 - Send crypto and wait for confirmation
+
+> **Note**  
+> Only BTC, LTC and SOL have a button in this menu. The other networks the bot supports
+> (DOGE, ETH, BNB, USDT/USDC on Solana, ERC-20 and BEP-20) are hidden, not removed:
+> payments already created for them, their provider callbacks, deposit statistics and
+> admin withdrawals all keep working. Edit `ACCEPTED_PAYMENT_COINS` in
+> `enums/cryptocurrency.py` to change which buttons buyers see.
 
 ### Purchase of goods
 

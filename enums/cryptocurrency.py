@@ -5,6 +5,11 @@ from enums.bot_entity import BotEntity
 from enums.language import Language
 from utils.utils import get_text
 
+# The only coins a buyer can pick in the "Top Up Balance" menu. Every other coin
+# stays fully supported by the code (already created payments and their
+# callbacks, statistics, admin withdrawals) - only their buttons are hidden.
+ACCEPTED_PAYMENT_COINS = ("BTC", "LTC", "SOL")
+
 
 class Cryptocurrency(str, Enum):
     BNB = "BNB"
@@ -93,8 +98,15 @@ class Cryptocurrency(str, Enum):
                 Cryptocurrency.USDT_ERC20, Cryptocurrency.USDC_ERC20]
 
     @staticmethod
+    def get_accepted_payment_coins() -> list['Cryptocurrency']:
+        """Coins the shop accepts from buyers, in the order their buttons appear."""
+        return [Cryptocurrency(name) for name in ACCEPTED_PAYMENT_COINS]
+
+    @staticmethod
     def get_hidden() -> set['Cryptocurrency']:
-        return set()
+        """Coins without a buyer-facing button; they keep working everywhere else."""
+        accepted = set(Cryptocurrency.get_accepted_payment_coins())
+        return {cryptocurrency for cryptocurrency in Cryptocurrency if cryptocurrency not in accepted}
 
     @staticmethod
     def get_visible() -> list['Cryptocurrency']:

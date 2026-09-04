@@ -85,7 +85,8 @@ def test_wallet_validates_ltc_addresses():
 
 
 @pytest.mark.asyncio
-async def test_top_up_buttons_include_supported_currencies():
+async def test_top_up_buttons_only_show_btc_ltc_and_sol():
+    """Only BTC, LTC and SOL have a payment button; the rest are hidden."""
     _, keyboard = await UserService.get_top_up_buttons(
         MyProfileCallback.create(level=1),
         Language.EN
@@ -98,8 +99,25 @@ async def test_top_up_buttons_include_supported_currencies():
         if getattr(button, "text", None)
     ]
 
-    assert "₿ BTC" in button_texts
-    assert "USDT ERC-20" in button_texts
+    assert button_texts == ["₿ BTC", "Ł LTC", "SOL", "⬅️ Back"]
+    for hidden in Cryptocurrency.get_hidden():
+        assert hidden.get_localized(Language.EN) not in button_texts
+
+
+def test_hidden_coins_are_only_missing_their_button():
+    """Hidden coins stay fully functional: enum, callback data and payments."""
+    assert [coin.name for coin in Cryptocurrency.get_visible()] == ["BTC", "LTC", "SOL"]
+    assert Cryptocurrency.USDT_ERC20 in Cryptocurrency.get_hidden()
+
+    # an old button (or a hand-built callback) still carries a hidden coin
+    packed = MyProfileCallback.create(level=2, cryptocurrency=Cryptocurrency.USDT_ERC20).pack()
+    assert MyProfileCallback.unpack(packed).cryptocurrency == Cryptocurrency.USDT_ERC20
+    # the coin still resolves and keeps its provider mapping
+    assert Cryptocurrency("USDT_ERC20") == Cryptocurrency.USDT_ERC20
+    assert Cryptocurrency.DOGE.get_coingecko_name() == "dogecoin"
+    assert Cryptocurrency.get_accepted_payment_coins() == [
+        Cryptocurrency.BTC, Cryptocurrency.LTC, Cryptocurrency.SOL
+    ]
 
 
 @pytest.mark.asyncio

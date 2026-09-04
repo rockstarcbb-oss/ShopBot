@@ -32,7 +32,7 @@ This repository is designed for developers and product teams who need a producti
 ## ✨ Why This Project
 
 - Sell products from two city catalogues (`💾 Panevėžys` and `🏷️ Kaunas`) directly in Telegram.
-- Accept crypto top-ups with Bitcoin, Dogecoin, Litecoin, Solana, Ethereum, Binance Coin, USDT, and USDC networks.
+- Accept crypto top-ups with Bitcoin, Litecoin and Solana; the other supported networks (Dogecoin, Ethereum, Binance Coin, USDT and USDC) stay wired up with their buttons hidden.
 - Manage inventory, users, coupons, shipping, reviews, media, and purchases from Telegram admin flows.
 - Use PostgreSQL, Redis, webhook mode, and Docker-based deployment for production setups.
 - Extend the project with FastAPI routes, SQLAdmin, repositories, services, and Aiogram handlers.
