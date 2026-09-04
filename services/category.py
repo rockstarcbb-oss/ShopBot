@@ -5,11 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from callbacks import AllCategoriesCallback
 from enums.bot_entity import BotEntity
-from enums.entity_type import EntityType
 from enums.keyboard_button import KeyboardButton
 from enums.language import Language
-from enums.sort_property import SortProperty
-from handlers.common.common import add_pagination_buttons, add_sorting_buttons, add_search_button, get_filters_settings
+from handlers.common.common import add_pagination_buttons, get_filters_settings
 from repositories.button_media import ButtonMediaRepository
 from repositories.category import CategoryRepository
 from services.media import MediaService
@@ -62,10 +60,6 @@ class CategoryService:
                                                                item_type=callback_data.item_type).pack()
                 )
             )
-        kb_builder = await add_search_button(kb_builder, EntityType.CATEGORY, callback_data, filters, language)
-        kb_builder = await add_sorting_buttons(
-            kb_builder, [SortProperty.NAME], callback_data, sort_pairs, language
-        )
         kb_builder = await add_pagination_buttons(
             kb_builder, callback_data, CategoryRepository.get_maximum_page(filters, session),
             callback_data.get_back_button(language, 0), language

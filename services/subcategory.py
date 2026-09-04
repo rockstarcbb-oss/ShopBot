@@ -7,10 +7,8 @@ from sqlalchemy.orm import Session
 import config
 from callbacks import AllCategoriesCallback
 from enums.bot_entity import BotEntity
-from enums.entity_type import EntityType
 from enums.language import Language
-from enums.sort_property import SortProperty
-from handlers.common.common import add_pagination_buttons, add_sorting_buttons, get_filters_settings, add_search_button
+from handlers.common.common import add_pagination_buttons, get_filters_settings
 from repositories.category import CategoryRepository
 from repositories.item import ItemRepository
 from repositories.subcategory import SubcategoryRepository
@@ -54,9 +52,6 @@ class SubcategoryService:
                 )
             )
         kb_builder.adjust(1)
-        kb_builder = await add_search_button(kb_builder, EntityType.SUBCATEGORY, callback_data, filters, language)
-        kb_builder = await add_sorting_buttons(kb_builder, [SortProperty.NAME, SortProperty.PRICE],
-                                               callback_data, sort_pairs, language)
         kb_builder = await add_pagination_buttons(kb_builder, callback_data,
                                                   SubcategoryRepository.get_maximum_page(callback_data.category_id,
                                                                                          filters, session),
