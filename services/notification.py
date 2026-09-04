@@ -181,12 +181,16 @@ class NotificationService:
             await bot.session.close()
 
     @staticmethod
-    async def deliver_digital_items(telegram_id: int, items: list[ItemDTO], language: Language):
-        deliveries = MessageService.build_digital_delivery_messages(items, language)
+    async def deliver_purchased_items(telegram_id: int, items: list[ItemDTO], language: Language):
+        """Send every purchased item to the buyer: its data plus the delivery photo.
+
+        Items from all cities (Panevezys and Kaunas) are delivered the same way.
+        """
+        deliveries = MessageService.build_delivery_messages(items, language)
         for image, caption in deliveries:
             if image:
                 if len(caption) > MessageService.PHOTO_CAPTION_LIMIT:
-                    short_caption = get_text(language, BotEntity.USER, "digital_item_photo_caption")
+                    short_caption = get_text(language, BotEntity.USER, "purchased_item_photo_caption")
                     await NotificationService.send_photo_to_user(image, short_caption, telegram_id)
                     await NotificationService.send_to_user(caption, telegram_id)
                 else:

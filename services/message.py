@@ -2,7 +2,6 @@ import re
 from collections import OrderedDict
 
 from enums.bot_entity import BotEntity
-from enums.item_type import ItemType
 from enums.language import Language
 from models.item import ItemDTO
 from utils.utils import get_text
@@ -22,8 +21,9 @@ class MessageService:
 
     @staticmethod
     def resolve_delivery_content(item: ItemDTO) -> tuple[str | None, str | None]:
-        """Return (image, code) for a purchased digital item.
+        """Return (image, code) for a purchased item, no matter its item type.
 
+        Items from every city (Panevezys and Kaunas) are delivered the same way.
         The image can be a Telegram file_id or an HTTPS URL stored on the item.
         If no dedicated image is set, an image URL embedded in private_data is used.
         """
@@ -57,12 +57,14 @@ class MessageService:
         return MessageService.create_message_with_codes(codes, language)
 
     @staticmethod
-    def build_digital_delivery_messages(items: list[ItemDTO], language: Language) -> list[tuple[str | None, str]]:
-        """Group digital items by delivery image and build (image, caption) payloads."""
+    def build_delivery_messages(items: list[ItemDTO], language: Language) -> list[tuple[str | None, str]]:
+        """Group purchased items by delivery image and build (image, caption) payloads.
+
+        Every item type is delivered the same way: the buyer receives the item data
+        and, when the seller attached one, the delivery photo.
+        """
         groups: OrderedDict[str, list[str | None]] = OrderedDict()
         for item in items:
-            if item.item_type != ItemType.DIGITAL:
-                continue
             image, code = MessageService.resolve_delivery_content(item)
             groups.setdefault(image or "", []).append(code)
         deliveries: list[tuple[str | None, str]] = []

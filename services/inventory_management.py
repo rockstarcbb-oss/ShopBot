@@ -157,9 +157,16 @@ class InventoryManagementService:
         cancel_button = InlineKeyboardButton(text=get_text(language, BotEntity.COMMON, "cancel"),
                                              callback_data=InventoryManagementCallback.create(1).pack())
         if current_state == InventoryManagementStates.item_type:
-            await state.update_data(item_type=message.html_text)
-            await state.set_state(InventoryManagementStates.category)
-            msg = get_text(language, BotEntity.ADMIN, "add_items_category")
+            try:
+                # Accepts DIGITAL/PHYSICAL as well as the city names shown in the bot.
+                item_type = ItemType.parse(message.html_text)
+            except ValueError:
+                # Re-ask right away instead of dragging an unknown type through the flow.
+                msg = get_text(language, BotEntity.ADMIN, "add_items_item_type")
+            else:
+                await state.update_data(item_type=item_type.value)
+                await state.set_state(InventoryManagementStates.category)
+                msg = get_text(language, BotEntity.ADMIN, "add_items_category")
         elif current_state == InventoryManagementStates.category:
             await state.update_data(category_name=message.html_text)
             await state.set_state(InventoryManagementStates.subcategory)
@@ -171,32 +178,22 @@ class InventoryManagementService:
         elif current_state == InventoryManagementStates.description:
             await state.update_data(description=message.html_text)
             await state.set_state(InventoryManagementStates.private_data)
-            if ItemType(state_data['item_type'].upper()) == ItemType.PHYSICAL:
-                msg = get_text(language, BotEntity.ADMIN, "add_items_private_data_physical")
-            else:
-                msg = get_text(language, BotEntity.ADMIN, "add_items_private_data")
+            # Items from every city (Panevezys and Kaunas) are added the same way:
+            # the admin sends the data lines and then a delivery photo for each line.
+            msg = get_text(language, BotEntity.ADMIN, "add_items_private_data")
         elif current_state == InventoryManagementStates.private_data:
-            price_msg = InventoryManagementService._price_prompt(language)
-            if ItemType(state_data['item_type'].upper()) == ItemType.PHYSICAL:
-                if message.html_text.isdecimal():
-                    await state.update_data(items_qty=int(message.html_text))
-                    await state.set_state(InventoryManagementStates.price)
-                    msg = price_msg
-                else:
-                    msg = get_text(language, BotEntity.ADMIN, "add_items_private_data_physical")
+            private_data_lines = [line.strip()
+                                  for line in message.html_text.split('\n')
+                                  if line.strip()]
+            if not private_data_lines:
+                msg = get_text(language, BotEntity.ADMIN, "add_items_private_data")
             else:
-                private_data_lines = [line.strip()
-                                      for line in message.html_text.split('\n')
-                                      if line.strip()]
-                if not private_data_lines:
-                    msg = get_text(language, BotEntity.ADMIN, "add_items_private_data")
-                else:
-                    await state.update_data(private_data=message.html_text,
-                                            private_data_lines=private_data_lines,
-                                            delivery_images=[])
-                    await state.set_state(InventoryManagementStates.delivery_image)
-                    state_data = await state.get_data()
-                    msg = InventoryManagementService._delivery_image_prompt(language, state_data)
+                await state.update_data(private_data=message.html_text,
+                                        private_data_lines=private_data_lines,
+                                        delivery_images=[])
+                await state.set_state(InventoryManagementStates.delivery_image)
+                state_data = await state.get_data()
+                msg = InventoryManagementService._delivery_image_prompt(language, state_data)
         elif current_state == InventoryManagementStates.delivery_image:
             delivery_image = InventoryManagementService._extract_delivery_image(message)
             if delivery_image is False:
@@ -220,37 +217,31 @@ class InventoryManagementService:
                 assert (price > 0)
                 await state.update_data(price=message.html_text)
                 state_data = await state.get_data()
-                item_type = ItemType(state_data['item_type'].upper())
+                item_type = ItemType.parse(state_data['item_type'])
                 category = await CategoryRepository.get_or_create(state_data['category_name'], session)
                 subcategory = await SubcategoryRepository.get_or_create(state_data['subcategory_name'], session)
-                if item_type == ItemType.PHYSICAL:
-                    items_list = [ItemDTO(item_type=item_type,
-                                          category_id=category.id,
-                                          subcategory_id=subcategory.id,
-                                          description=state_data['description'],
-                                          price=float(state_data['price']),
-                                          private_data=None,
-                                          delivery_image=None) for _ in range(state_data['items_qty'])]
-                else:
-                    private_data_lines = state_data.get('private_data_lines') or [
-                        line.strip() for line in state_data['private_data'].split('\n') if line.strip()
-                    ]
-                    delivery_images = state_data.get('delivery_images')
-                    if delivery_images is None:
-                        # Legacy single-image flows: apply the same image to every line.
-                        delivery_images = [state_data.get('delivery_image')] * len(private_data_lines)
-                    delivery_images = list(delivery_images)
-                    if len(delivery_images) < len(private_data_lines):
-                        delivery_images.extend([None] * (len(private_data_lines) - len(delivery_images)))
-                    items_list = [ItemDTO(item_type=item_type,
-                                          category_id=category.id,
-                                          subcategory_id=subcategory.id,
-                                          description=state_data['description'],
-                                          price=float(state_data['price']),
-                                          private_data=private_data,
-                                          delivery_image=delivery_image)
-                                  for private_data, delivery_image in
-                                  zip(private_data_lines, delivery_images)]
+                # Both item types are built from the data lines, each with its own
+                # delivery photo, so a Kaunas item is delivered exactly like a
+                # Panevezys one: data + photo right after the purchase.
+                private_data_lines = state_data.get('private_data_lines') or [
+                    line.strip() for line in state_data['private_data'].split('\n') if line.strip()
+                ]
+                delivery_images = state_data.get('delivery_images')
+                if delivery_images is None:
+                    # Legacy single-image flows: apply the same image to every line.
+                    delivery_images = [state_data.get('delivery_image')] * len(private_data_lines)
+                delivery_images = list(delivery_images)
+                if len(delivery_images) < len(private_data_lines):
+                    delivery_images.extend([None] * (len(private_data_lines) - len(delivery_images)))
+                items_list = [ItemDTO(item_type=item_type,
+                                      category_id=category.id,
+                                      subcategory_id=subcategory.id,
+                                      description=state_data['description'],
+                                      price=float(state_data['price']),
+                                      private_data=private_data,
+                                      delivery_image=delivery_image)
+                              for private_data, delivery_image in
+                              zip(private_data_lines, delivery_images)]
                 await ItemRepository.add_many(items_list, session)
                 await session_commit(session)
                 await state.clear()

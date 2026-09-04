@@ -10,7 +10,6 @@ from db import session_commit
 from enums.bot_entity import BotEntity
 from enums.buy_status import BuyStatus
 from enums.entity_type import EntityType
-from enums.item_type import ItemType
 from enums.language import Language
 from enums.sort_property import SortProperty
 from enums.user_role import UserRole
@@ -76,16 +75,18 @@ class BuyService:
             qty=len(items),
             purchase_datetime=us_datetime_12h
         ))
-        has_physical = any(item.item_type == ItemType.PHYSICAL for item in items)
-        if has_physical is False:
-            content_list.append(get_text(language, BotEntity.USER, "purchase_details_items_section").format(
-                purchased_items=purchased_items_msg
-            ))
+        # Items from every city (Panevezys and Kaunas) are delivered instantly, so the
+        # purchased data is always shown here, together with the delivery photo below.
+        content_list.append(get_text(language, BotEntity.USER, "purchase_details_items_section").format(
+            purchased_items=purchased_items_msg
+        ))
         msg = "\n".join(content_list)
         kb_builder = InlineKeyboardBuilder()
         review_dto = await ReviewRepository.get_by_buy_item_id(callback_data.buyItem_id, session)
+        # Legacy orders that still have a shipping address are reviewable once completed.
+        is_instant_delivery = buy.shipping_address is None
         if callback_data.user_role == UserRole.USER and (
-                buy.status == BuyStatus.COMPLETED or has_physical is False) and review_dto is None:
+                buy.status == BuyStatus.COMPLETED or is_instant_delivery) and review_dto is None:
             kb_builder.button(
                 text=get_text(language, BotEntity.USER, "review").format(
                     subcategory_name=subcategory.name

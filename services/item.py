@@ -26,6 +26,14 @@ from utils.utils import get_text
 
 class ItemService:
     ANNOUNCEMENT_MESSAGE_LIMIT = 4000
+    # Values used in JSON/TXT imports to say "this item has no data attached".
+    EMPTY_DATA_VALUES = {"", "null", "none", "-"}
+
+    @staticmethod
+    def normalize_private_data(value: str | None) -> str | None:
+        if value is None:
+            return None
+        return None if value.strip().lower() in ItemService.EMPTY_DATA_VALUES else value
 
     @staticmethod
     def _wrap_announcement_chunk(content: str) -> str:
@@ -125,16 +133,16 @@ class ItemService:
             items = load(file)
             items_list = []
             for item in items:
-                item_type = ItemType(item['item_type'].upper())
+                item_type = ItemType.parse(item['item_type'])
                 category = await CategoryRepository.get_or_create(item['category'], session)
                 subcategory = await SubcategoryRepository.get_or_create(item['subcategory'], session)
                 item.pop('item_type')
                 item.pop('category')
                 item.pop('subcategory')
-                if item_type == ItemType.PHYSICAL:
-                    item.pop('private_data', None)
-                    item.pop('delivery_image', None)
-                elif not item.get('delivery_image'):
+                # Items from every city are delivered the same way, so the data and
+                # the delivery photo are kept for both item types.
+                item['private_data'] = ItemService.normalize_private_data(item.get('private_data'))
+                if not item.get('delivery_image'):
                     item['delivery_image'] = None
                 items_list.append(ItemDTO(
                     item_type=item_type,
@@ -155,13 +163,11 @@ class ItemService:
                     continue
                 parts = raw_line.split(';')
                 item_type, category_name, subcategory_name, description, price, private_data = parts[:6]
+                private_data = ItemService.normalize_private_data(private_data)
                 delivery_image = parts[6] if len(parts) > 6 else None
                 if MessageService.is_skip_delivery_image(delivery_image):
                     delivery_image = None
-                item_type = ItemType(item_type.upper())
-                if item_type == ItemType.PHYSICAL:
-                    private_data = None
-                    delivery_image = None
+                item_type = ItemType.parse(item_type)
                 category = await CategoryRepository.get_or_create(category_name, session)
                 subcategory = await SubcategoryRepository.get_or_create(subcategory_name, session)
                 items_list.append(ItemDTO(
