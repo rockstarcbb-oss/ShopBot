@@ -32,6 +32,7 @@ from models.subcategory import SubcategoryAdmin
 from models.user import UserAdmin
 from processing.processing import processing_router
 from repositories.button_media import ButtonMediaRepository
+from repositories.category import CategoryRepository
 from services.media import MediaService
 from services.notification import NotificationService
 from services.wallet import WalletService
@@ -50,6 +51,7 @@ async def _startup() -> None:
                     f"{config.WEBHOOK_URL}cryptoprocessing/event")
     logging.warning("Admin Telegram ids (OWNER_ADMIN_ID_LIST + ADMIN_ID_LIST): %s", config.ADMIN_ID_LIST)
     await MediaService.ensure_bot_photo(bot)
+    await CategoryRepository.init_permanent_categories()
     await MediaService.update_inaccessible_media(bot)
     validate_i18n()
     await ButtonMediaRepository.init_buttons_media()

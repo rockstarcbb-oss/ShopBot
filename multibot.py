@@ -17,6 +17,7 @@ from aiogram.webhook.aiohttp_server import (
 from db import create_db_and_tables
 from enums.bot_entity import BotEntity
 from enums.language import Language
+from repositories.category import CategoryRepository
 from services.media import MediaService
 from services.multibot import MultibotService
 from utils.custom_filters import AdminIdFilter
@@ -72,6 +73,7 @@ async def on_startup(dispatcher: Dispatcher, bot: Bot):
     await bot.set_webhook(f"{BASE_URL}{MAIN_BOT_PATH}")
     await create_db_and_tables()
     await MediaService.ensure_bot_photo(bot)
+    await CategoryRepository.init_permanent_categories()
     await MultibotService.restore_child_bot_webhooks(OTHER_BOTS_URL)
     logging.warning("Admin Telegram ids (OWNER_ADMIN_ID_LIST + ADMIN_ID_LIST): %s", config.ADMIN_ID_LIST)
     for admin in config.ADMIN_ID_LIST:

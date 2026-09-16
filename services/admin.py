@@ -35,7 +35,7 @@ class AdminService:
         match callback_data.entity_type:
             case EntityType.CATEGORY:
                 entities = await CategoryRepository.get_to_delete(sort_pairs, filters, callback_data.page, session)
-                max_page_method = CategoryRepository.get_maximum_page(filters, session)
+                max_page_method = CategoryRepository.get_maximum_page(filters, session, include_permanent=False)
             case _:
                 entities = await SubcategoryRepository.get_to_delete(sort_pairs, filters, callback_data.page, session)
                 max_page_method = SubcategoryRepository.get_maximum_page(None, filters, session)

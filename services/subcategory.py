@@ -7,14 +7,15 @@ from sqlalchemy.orm import Session
 import config
 from callbacks import AllCategoriesCallback
 from enums.bot_entity import BotEntity
+from enums.keyboard_button import KeyboardButton
 from enums.language import Language
 from handlers.common.common import add_pagination_buttons, get_filters_settings
+from repositories.button_media import ButtonMediaRepository
 from repositories.category import CategoryRepository
 from repositories.item import ItemRepository
 from repositories.subcategory import SubcategoryRepository
 from services.media import MediaService
 from utils.utils import get_text
-from utils.utils import get_bot_photo_id
 
 
 class SubcategoryService:
@@ -67,13 +68,13 @@ class SubcategoryService:
                 category_name=category_dto.name,
                 item_type=item_type
             )
-            media = MediaService.convert_to_media(category_dto.media_id, caption)
         else:
             caption = caption.format(
                 category_name=get_text(language, BotEntity.COMMON, "all"),
                 item_type=item_type
             )
-            media = InputMediaPhoto(media=get_bot_photo_id(), caption=caption)
+        button_media = await ButtonMediaRepository.get_by_button(KeyboardButton.ALL_CATEGORIES, session)
+        media = MediaService.convert_to_media(button_media.media_id, caption)
         return media, kb_builder
 
     @staticmethod
@@ -114,7 +115,8 @@ class SubcategoryService:
             ))
         kb_builder.adjust(3)
         kb_builder.row(callback_data.get_back_button(language))
-        media = MediaService.convert_to_media(subcategory_dto.media_id, caption)
+        button_media = await ButtonMediaRepository.get_by_button(KeyboardButton.ALL_CATEGORIES, session)
+        media = MediaService.convert_to_media(button_media.media_id, caption)
         return media, kb_builder
 
     @staticmethod

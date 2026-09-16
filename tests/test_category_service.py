@@ -20,7 +20,7 @@ def _patch_empty_city_dependencies(monkeypatch):
     async def _get_empty_categories(sort_pairs, filters, item_type, page, session):
         return []
 
-    async def _get_max_page(filters, session):
+    async def _get_max_page(filters, session, item_type=None):
         return 0
 
     async def _get_button(button, session):
