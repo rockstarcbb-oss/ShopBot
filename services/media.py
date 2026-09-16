@@ -6,6 +6,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, InputMediaPhoto, InputMediaVideo, InputMediaAnimation, URLInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import config
@@ -65,6 +66,28 @@ class MediaService:
         )
         kb_builder.adjust(1)
         return get_text(language, BotEntity.ADMIN, "media_management"), kb_builder
+
+    @staticmethod
+    async def get_greeting_media(language: Language, session: AsyncSession):
+        """
+        Media for the /start greeting message ("👋 Hi").
+
+        It is stored in the buttons_media table under KeyboardButton.START_MESSAGE,
+        so admins can replace it from Admin Menu -> Media management like any
+        other button media. Falls back to the cached bot photo for databases
+        created before the row existed.
+        """
+        try:
+            button_media = await ButtonMediaRepository.get_by_button(KeyboardButton.START_MESSAGE, session)
+            media_id = button_media.media_id
+        except NoResultFound:
+            # Databases created before the greeting row existed (or a failed
+            # startup seeding) must not break the /start handler.
+            media_id = f"0{get_bot_photo_id()}"
+        return MediaService.convert_to_media(
+            media_id,
+            caption=get_text(language, BotEntity.COMMON, "start_message")
+        )
 
     @staticmethod
     async def set_entity_media_edit(callback_data: MediaManagementCallback,

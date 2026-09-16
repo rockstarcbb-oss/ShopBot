@@ -7,6 +7,7 @@ from utils.utils import get_text
 
 
 class KeyboardButton(Enum):
+    START_MESSAGE = "START_MESSAGE"
     ALL_CATEGORIES = "ALL_CATEGORIES"
     MY_PROFILE = "MY_PROFILE"
     FAQ = "FAQ"

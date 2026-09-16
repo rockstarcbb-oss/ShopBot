@@ -374,10 +374,19 @@ Open `🔑 Admin Menu -> 📊 Analytics & Reports`, select an entity, then choos
 
 ### Media management
 
-Open `🔑 Admin Menu -> 📷 Media management` to change category, subcategory, or button media.
+Open `🔑 Admin Menu -> 📷 Media management` to change category, subcategory, button media, or the
+`/start` greeting message media (the photo shown above the `👋 Hi` text).
 
 > **Note**  
 > Media can be GIFs, images, or videos.
+
+#### Start message media
+
+`📷 Media management -> 📷 Edit 👋 Start message media` replaces the photo, video, or GIF that the
+bot sends together with the `/start` greeting. The media is stored per bot in the `buttons_media`
+table (`START_MESSAGE` row) and is created automatically on startup with the bot profile photo,
+so the greeting looks the same as before until you change it. The greeting caption stays
+`common.start_message` from the language files.
 
 ![Media Management](https://i.imgur.com/VIQdxvL.gif)
 
