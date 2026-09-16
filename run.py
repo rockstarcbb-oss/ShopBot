@@ -61,10 +61,7 @@ async def start(message: Message, command: CommandObject, session: AsyncSession,
 
 @main_router.message(F.text.in_(KeyboardButton.get_localized_set(KeyboardButton.FAQ)), IsUserExistFilter())
 async def faq(message: Message, session: AsyncSession, language: Language):
-    button_media = await ButtonMediaRepository.get_by_button(KeyboardButton.FAQ, session)
-    media = MediaService.convert_to_media(button_media.media_id,
-                                          caption=get_text(language, BotEntity.USER, "faq_string"))
-    await NotificationService.answer_media(message, media)
+    await message.answer(get_text(language, BotEntity.USER, "faq_string"))
 
 
 @main_router.message(F.text.in_(KeyboardButton.get_localized_set(KeyboardButton.HELP)), IsUserExistFilter())

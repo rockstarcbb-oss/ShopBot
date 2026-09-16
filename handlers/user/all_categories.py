@@ -9,9 +9,11 @@ from enums.keyboard_button import KeyboardButton as KB
 from enums.language import Language
 from handlers.common.common import enable_search
 from handlers.user.constants import UserStates
+from repositories.button_media import ButtonMediaRepository
 from services.cart import CartService
 from services.category import CategoryService
 from services.item import ItemService
+from services.media import MediaService
 from services.notification import NotificationService
 from services.subcategory import SubcategoryService
 from utils.custom_filters import IsUserExistFilter
@@ -56,6 +58,8 @@ async def all_categories(**kwargs):
                                                 state,
                                                 UserStates.filter_items,
                                                 language)
+        button_media = await ButtonMediaRepository.get_by_button(KB.ALL_CATEGORIES, session)
+        media = MediaService.convert_to_media(button_media.media_id, media.caption)
     else:
         await state.update_data(filter=None)
         await state.set_state()
@@ -81,6 +85,8 @@ async def show_subcategories_in_category(**kwargs):
                                                 state,
                                                 UserStates.filter_items,
                                                 language)
+        button_media = await ButtonMediaRepository.get_by_button(KB.ALL_CATEGORIES, session)
+        media = MediaService.convert_to_media(button_media.media_id, media.caption)
     else:
         await state.update_data(filter=None)
         await state.set_state()

@@ -161,8 +161,16 @@ User registration happens automatically on the first `/start` command.
 Open `All categories`, pick a city (`💾 Panevezys` or `🏷️ Kaunas`), select a category, select a subcategory, choose the quantity, add it to the cart and confirm the purchase.
 
 Both city buttons (`💾 Panevezys` and `🏷️ Kaunas`) are always visible on the city
-screen, even when a city has no items in stock right now. If you open a city that
-is currently empty, the bot shows an empty-state message instead of hiding the city.
+screen, even when a city has no items in stock right now. `Cartukai 🛒` is a permanent
+category in both cities, including when empty or sold out. It is created automatically
+on startup (existing categories with that exact name are reused). Add stock under
+`Cartukai 🛒` with `DIGITAL` for Panevėžys or `PHYSICAL` for Kaunas; stock stays
+separate by city. Other categories only appear when they have unsold stock.
+
+The media configured for `All categories` is reused on category and subcategory
+lists, their search prompts, and the quantity-selection screen. Category/subcategory
+media no longer overrides this shared catalogue media; item delivery photos are
+unchanged. FAQ replies are text-only, with no placeholder photo.
 
 Every purchase is delivered immediately after the balance is charged, no matter which city the item comes from: the bot sends the item data and, when the seller attached one, the delivery photo (QR code, game card, pickup code, parcel photo, ...) with the data in the caption below it. There is no shipping address and no shipping option step - a Kaunas item is bought exactly like a Panevezys one. You can reopen the same data and photo later from `My Profile -> Purchase History`.
 

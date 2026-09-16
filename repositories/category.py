@@ -1,11 +1,10 @@
-import math
-
 from sqlalchemy import select, func, update, or_, and_
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 import config
-from db import session_execute, session_flush
+from db import get_db_session, session_commit, session_execute, session_flush
 from enums.item_type import ItemType
 from enums.sort_order import SortOrder
 from enums.sort_property import SortProperty
@@ -14,7 +13,35 @@ from models.item import Item
 from utils.utils import get_bot_photo_id, calculate_max_page
 
 
+# Shared categories are visible in both city catalogues, regardless of stock.
+PERMANENT_CATEGORY_NAMES = ("Cartukai 🛒",)
+
+
 class CategoryRepository:
+    @staticmethod
+    async def init_permanent_categories():
+        async with get_db_session() as session:
+            for name in PERMANENT_CATEGORY_NAMES:
+                # Preserve existing categories, IDs and media; safe on repeated startup.
+                stmt = (insert(Category)
+                        .values(name=name, media_id=f"0{get_bot_photo_id()}")
+                        .on_conflict_do_nothing(index_elements=[Category.name]))
+                await session_execute(stmt, session)
+            await session_commit(session)
+
+    @staticmethod
+    def _catalogue_query(filters, item_type, include_permanent=True):
+        stock_conditions = [Item.category_id == Category.id, Item.is_sold == False]
+        if item_type is not None:
+            stock_conditions.append(Item.item_type == item_type)
+        visible = Item.id.is_not(None)
+        if include_permanent:
+            visible = or_(Category.name.in_(PERMANENT_CATEGORY_NAMES), visible)
+        stmt = select(Category).outerjoin(Item, and_(*stock_conditions)).where(visible)
+        if filters:
+            stmt = stmt.where(or_(*(Category.name.icontains(name) for name in filters)))
+        return stmt.distinct()
+
     @staticmethod
     async def get(sort_pairs: dict[str, int],
                   filters: list[str] | None,
@@ -22,16 +49,6 @@ class CategoryRepository:
                   page: int,
                   session: AsyncSession) -> list[CategoryDTO]:
         sort_methods = []
-        conditions = [
-            Item.is_sold == False
-        ]
-        if item_type:
-            conditions.append(
-                Item.item_type == item_type
-            )
-        if filters is not None:
-            filter_conditions = [Category.name.icontains(name) for name in filters]
-            conditions.append(or_(*filter_conditions))
         for sort_property, sort_order in sort_pairs.items():
             sort_property, sort_order = SortProperty(int(sort_property)), SortOrder(sort_order)
             if sort_order != SortOrder.DISABLE:
@@ -39,33 +56,22 @@ class CategoryRepository:
                 sort_column = sort_property.get_column(table)
                 sort_method = (getattr(sort_column, sort_order.name.lower()))
                 sort_methods.append(sort_method())
-        stmt = (select(Category)
-                .join(Item, Item.category_id == Category.id)
-                .where(and_(*conditions))
-                .distinct()
+        stmt = (CategoryRepository._catalogue_query(filters, item_type)
                 .limit(config.PAGE_ENTRIES)
                 .offset(page * config.PAGE_ENTRIES)
-                .order_by(*sort_methods))
+                .order_by(*sort_methods, Category.id))
         category_names = await session_execute(stmt, session)
         categories = category_names.scalars().all()
         return [CategoryDTO.model_validate(category, from_attributes=True) for category in categories]
 
     @staticmethod
-    async def get_maximum_page(filters: list[str] | None, session: AsyncSession) -> int:
-        conditions = [Item.is_sold == False]
-        if filters is not None:
-            filter_conditions = [Category.name.icontains(name) for name in filters]
-            conditions.append(or_(*filter_conditions))
-        sub_stmt = (
-            select(Category.id)
-            .join(Item, Item.category_id == Category.id)
-            .where(and_(*conditions))
-            .distinct()
-        ).alias('unique_categories')
+    async def get_maximum_page(filters: list[str] | None, session: AsyncSession,
+                               item_type: ItemType | None = None,
+                               include_permanent: bool = True) -> int:
+        sub_stmt = CategoryRepository._catalogue_query(filters, item_type, include_permanent).subquery()
         stmt = select(func.count()).select_from(sub_stmt)
-        max_page = await session_execute(stmt, session)
-        max_page = max_page.scalar_one()
-        return calculate_max_page(max_page)
+        result = await session_execute(stmt, session)
+        return calculate_max_page(result.scalar_one())
 
     @staticmethod
     async def get_by_id(category_id: int, session: Session | AsyncSession) -> CategoryDTO:

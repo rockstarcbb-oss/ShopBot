@@ -50,6 +50,7 @@ class MediaService:
         )
         buttons = [button for button in KeyboardButton]
         buttons.remove(KeyboardButton.ADMIN_MENU)
+        buttons.remove(KeyboardButton.FAQ)
         for button in buttons:
             kb_builder.button(
                 text=get_text(language, BotEntity.ADMIN, "edit_media").format(

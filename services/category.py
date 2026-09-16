@@ -68,7 +68,7 @@ class CategoryService:
                 )
             )
         kb_builder = await add_pagination_buttons(
-            kb_builder, callback_data, CategoryRepository.get_maximum_page(filters, session),
+            kb_builder, callback_data, CategoryRepository.get_maximum_page(filters, session, callback_data.item_type),
             callback_data.get_back_button(language, 0), language
         )
         button_media = await ButtonMediaRepository.get_by_button(
