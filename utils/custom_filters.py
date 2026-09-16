@@ -2,7 +2,7 @@ from aiogram import types
 from aiogram.filters import BaseFilter
 from aiogram.types import Message
 
-from config import ADMIN_ID_LIST
+import config
 from db import get_db_session
 from models.user import UserDTO
 from repositories.user import UserRepository
@@ -12,7 +12,7 @@ from services.user import UserService
 class AdminIdFilter(BaseFilter):
 
     async def __call__(self, message: types.message):
-        return message.from_user.id in ADMIN_ID_LIST
+        return message.from_user.id in config.ADMIN_ID_LIST
 
 
 class IsUserExistFilter(BaseFilter):

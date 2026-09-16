@@ -22,7 +22,10 @@ validate_currency() {
 }
 
 validate_admin_ids() {
-  echo "$1" | grep -Eq '^[0-9]+(,[0-9]+)*$'
+  # Same tolerant formats config.py accepts: 111,222 / (111,222) / [111, 222] / "111";"222"
+  local ids
+  ids=$(printf '%s' "$1" | sed -e "s/[][(){}\"' ]//g" -e 's/;/,/g')
+  [ -n "$ids" ] && printf '%s' "$ids" | grep -Eq '^[0-9]+(,[0-9]+)*$'
 }
 
 validate_support_link() {
@@ -135,7 +138,7 @@ fi
 # -------------------------
 
 while :; do
-  printf "ADMIN_ID_LIST (comma separated ints): "
+  printf "ADMIN_ID_LIST (comma separated ints, e.g. 123456,654321): "
   read ADMIN_ID_LIST
   validate_admin_ids "$ADMIN_ID_LIST" && break
   echo "❌ Invalid ADMIN_ID_LIST"

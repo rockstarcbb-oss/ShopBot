@@ -27,7 +27,7 @@ from services.notification import NotificationService
 from services.review import ReviewService
 from services.user import UserService
 from utils.custom_filters import IsUserExistFilter, IsUserBannedFilter
-from utils.utils import get_bot_photo_id, get_text
+from utils.utils import get_text
 
 logging.basicConfig(level=logging.INFO)
 main_router = Router()
@@ -55,10 +55,8 @@ async def start(message: Message, command: CommandObject, session: AsyncSession,
     if telegram_id in config.ADMIN_ID_LIST:
         keyboard.append([admin_menu_button])
     start_markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2, keyboard=keyboard)
-    bot_photo_id = get_bot_photo_id()
-    await message.answer_photo(photo=bot_photo_id,
-                               caption=get_text(language, BotEntity.COMMON, "start_message"),
-                               reply_markup=start_markup)
+    greeting_media = await MediaService.get_greeting_media(language, session)
+    await NotificationService.answer_media(message, greeting_media, reply_markup=start_markup)
 
 
 @main_router.message(F.text.in_(KeyboardButton.get_localized_set(KeyboardButton.FAQ)), IsUserExistFilter())

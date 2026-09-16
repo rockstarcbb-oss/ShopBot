@@ -24,6 +24,62 @@ NO_IMAGE_URL = ("https://img.freepik.com/premium-vector/no-photo-available-vecto
                 "picture-coming-soon-web-site-mobile-app_87543-18055.jpg")
 
 
+# ADMIN_ID_LIST is set as a plain environment variable (Railway, Docker, .env),
+# so the accepted separators are a comma, a semicolon and any whitespace.
+# Brackets/parentheses and quotes are stripped as well, which lets a value
+# copied from a Python list or a JSON array ("(111,222)", "[111, 222]",
+# "\"111\",\"222\"") work unchanged.
+ADMIN_ID_SEPARATOR_RE = re.compile(r"[,;\s]+")
+ADMIN_ID_RE = re.compile(r"^\d+$")
+
+
+def parse_admin_id_list(raw_value: str | None) -> list[int]:
+    """
+    Parse the raw ADMIN_ID_LIST environment value into a list of Telegram ids.
+
+    All of the following are equivalent and produce [111, 222]:
+        111,222
+        (111,222)
+        [111, 222]
+        "111";"222"
+
+    Duplicates are removed while the original order is preserved, and entries
+    that are not plain positive integers are skipped with a warning, so a
+    single typo cannot take the whole admin list down at startup.
+    """
+    if raw_value is None:
+        return []
+    normalized = re.sub(r"[\[\](){}<>]", " ", str(raw_value))
+    normalized = normalized.replace('"', " ").replace("'", " ")
+    admin_ids: list[int] = []
+    for chunk in ADMIN_ID_SEPARATOR_RE.split(normalized):
+        if not chunk:
+            continue
+        if ADMIN_ID_RE.match(chunk) is None:
+            logging.warning("ADMIN_ID_LIST: '%s' is not a valid Telegram id and will be ignored", chunk)
+            continue
+        admin_id = int(chunk)
+        if admin_id not in admin_ids:
+            admin_ids.append(admin_id)
+    return admin_ids
+
+
+def build_admin_id_list(owner_ids: list[int], raw_value: str | None) -> list[int]:
+    """
+    Merge the ids that always keep admin access with the ones coming from the
+    ADMIN_ID_LIST environment variable.
+
+    The order of ``owner_ids`` is preserved, ids added through the environment
+    are appended, and duplicates are dropped, so listing your own id in the
+    variable is harmless.
+    """
+    admin_ids = list(owner_ids)
+    for admin_id in parse_admin_id_list(raw_value):
+        if admin_id not in admin_ids:
+            admin_ids.append(admin_id)
+    return admin_ids
+
+
 def get_sslipio_external_url():
     external_ip = urllib.request.urlopen('https://api.ipify.org').read().decode('utf8')
     sslip_url = "https://" + external_ip + ".sslip.io"

@@ -48,6 +48,7 @@ async def _startup() -> None:
     await create_db_and_tables()
     logging.warning("Crypto payment callback URL (must be reachable by the provider): %s",
                     f"{config.WEBHOOK_URL}cryptoprocessing/event")
+    logging.warning("Admin Telegram ids (OWNER_ADMIN_ID_LIST + ADMIN_ID_LIST): %s", config.ADMIN_ID_LIST)
     await MediaService.ensure_bot_photo(bot)
     await MediaService.update_inaccessible_media(bot)
     validate_i18n()
