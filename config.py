@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 from enums.currency import Currency
 from enums.runtime_environment import RuntimeEnvironment
-from utils.utils import get_sslipio_external_url, start_ngrok, hash_password
+from utils.utils import get_sslipio_external_url, start_ngrok, hash_password, build_admin_id_list
 
 load_dotenv(".env.bot.dev")
 RUNTIME_ENVIRONMENT = os.environ.get("RUNTIME_ENVIRONMENT", "production")
@@ -20,7 +20,13 @@ WEBAPP_HOST = os.environ.get("WEBAPP_HOST", "0.0.0.0")
 WEBAPP_PORT = int(os.environ.get("WEBAPP_PORT", "5000"))
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 TOKEN = os.environ.get("TOKEN")
-ADMIN_ID_LIST = [1670676945]
+# Telegram ids that always keep admin access (the bot owner).
+OWNER_ADMIN_ID_LIST = [1670676945]
+# Extra admins are set with the ADMIN_ID_LIST environment variable (Railway
+# variables / .env), e.g. ADMIN_ID_LIST=123456,654321 - parentheses, brackets,
+# quotes, semicolons and spaces are accepted too, e.g. "(123456,654321)".
+# The ids from the environment are merged with OWNER_ADMIN_ID_LIST.
+ADMIN_ID_LIST = build_admin_id_list(OWNER_ADMIN_ID_LIST, os.environ.get("ADMIN_ID_LIST"))
 SUPPORT_LINK = os.environ.get("SUPPORT_LINK")
 # POSTGRESQL
 DB_USER = os.environ.get("POSTGRES_USER", "postgres")

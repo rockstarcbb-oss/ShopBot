@@ -24,7 +24,7 @@ Full documentation for deployment, configuration, user flows, admin flows, refer
 | `WEBAPP_HOST` | Hostname for the Telegram bot service. | `0.0.0.0` for Docker Compose, `localhost` for local deployment |
 | `WEBAPP_PORT` | Port for the Telegram bot service. | `5000` |
 | `TOKEN` | Telegram bot token from `@BotFather`. | No recommended value |
-| `ADMIN_ID_LIST` | Comma-separated list of Telegram IDs that can access the admin menu. | No recommended value |
+| `ADMIN_ID_LIST` | Telegram IDs that can access the admin menu. Comma-separated (`123456,654321`); parentheses, brackets, quotes, semicolons and spaces are accepted too (`(123456,654321)`). Merged with `OWNER_ADMIN_ID_LIST` from `config.py`. | No recommended value |
 | `SUPPORT_LINK` | Telegram support profile URL used by the Help button. | `https://t.me/${YOUR_USERNAME_TG}` |
 | `POSTGRES_USER` | PostgreSQL username. | `postgres` |
 | `POSTGRES_PASSWORD` | PostgreSQL password. | Any strong value |
@@ -176,13 +176,39 @@ Open `My Profile -> Purchase History` to see previous purchases and open details
 
 ### Adding a new admin
 
-Add the Telegram ID to `ADMIN_ID_LIST`, separated by commas, and restart the bot.
+Add the Telegram ID to the `ADMIN_ID_LIST` environment variable, separated by commas, and restart the bot.
 
 Example:
 
 ```env
 ADMIN_ID_LIST=123456,654321
 ```
+
+On Railway open your service -> `Variables` -> `New Variable`, add `ADMIN_ID_LIST` with all the
+Telegram IDs separated by commas, then redeploy:
+
+```env
+ADMIN_ID_LIST=123456,654321
+```
+
+Accepted formats (all of them produce the same list):
+
+```env
+ADMIN_ID_LIST=123456,654321
+ADMIN_ID_LIST=(123456,654321)
+ADMIN_ID_LIST=[123456, 654321]
+ADMIN_ID_LIST="123456";"654321"
+```
+
+Notes:
+
+- The IDs from `OWNER_ADMIN_ID_LIST` in `config.py` (the bot owner) always keep admin access;
+  `ADMIN_ID_LIST` only adds more admins on top of them. Duplicates are ignored.
+- Entries that are not plain positive integers are skipped and reported in the startup log,
+  so a typo cannot break the rest of the list.
+- On startup the bot logs `Admin Telegram ids (OWNER_ADMIN_ID_LIST + ADMIN_ID_LIST): [...]` and
+  sends `Bot is working` to every ID, which is the quickest way to confirm the list.
+- Every admin in the list receives admin notifications and can connect child bots in multibot mode.
 
 ### Announcements
 
@@ -336,7 +362,7 @@ Open `🔑 Admin Menu -> 📊 Analytics & Reports`, select an entity, then choos
 ### Admin notifications
 
 > **Note**  
-> All Telegram IDs from `ADMIN_ID_LIST` receive admin notifications.
+> All Telegram IDs from `ADMIN_ID_LIST` (plus `OWNER_ADMIN_ID_LIST`) receive admin notifications.
 
 #### New deposit notification
 
@@ -467,7 +493,7 @@ You can work with database objects using the SQLAdmin admin panel.
 - Start the stack with `docker-compose up`
 - This launches one main manager bot
 - Child bots are added only through the main bot
-- Only Telegram IDs from `ADMIN_ID_LIST` can connect child bots
+- Only Telegram IDs from `ADMIN_ID_LIST` (plus `OWNER_ADMIN_ID_LIST`) can connect child bots
 - To add a managed bot, send `/add {token}` to the main bot
 - Connected child bot tokens are stored in Redis under `multibot:tokens`
 - On startup, the app restores child bot webhooks from Redis automatically

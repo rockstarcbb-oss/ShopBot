@@ -73,6 +73,7 @@ async def on_startup(dispatcher: Dispatcher, bot: Bot):
     await create_db_and_tables()
     await MediaService.ensure_bot_photo(bot)
     await MultibotService.restore_child_bot_webhooks(OTHER_BOTS_URL)
+    logging.warning("Admin Telegram ids (OWNER_ADMIN_ID_LIST + ADMIN_ID_LIST): %s", config.ADMIN_ID_LIST)
     for admin in config.ADMIN_ID_LIST:
         try:
             await bot.send_message(admin, 'Bot is working')

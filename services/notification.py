@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 import config
 from callbacks import MyProfileCallback, ReviewManagementCallback
-from config import ADMIN_ID_LIST, TOKEN
+from config import TOKEN
 from enums.bot_entity import BotEntity
 from enums.cryptocurrency import Cryptocurrency
 from enums.language import Language
@@ -124,7 +124,7 @@ class NotificationService:
     @staticmethod
     async def send_to_admins(message: str | BufferedInputFile, reply_markup: types.InlineKeyboardMarkup | None):
         bot = create_bot(TOKEN)
-        for admin_id in ADMIN_ID_LIST:
+        for admin_id in config.ADMIN_ID_LIST:
             try:
                 if isinstance(message, str):
                     async def _send(current_markup):
